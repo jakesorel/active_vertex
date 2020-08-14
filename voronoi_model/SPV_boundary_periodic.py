@@ -5,36 +5,41 @@ import matplotlib.pyplot as plt
 
 vor = Tissue()
 vor.generate_cells(300)
-vor.make_init(10)
+vor.make_init_boundary_periodic(13,0.3)
 alpha = 0.08
-c_types = (((vor.x0-vor.L/2)**2).sum(axis=1) < (vor.L/6)**2).astype(int)
-vor.set_interaction(W = alpha*np.array([[0, 1], [1, 0]]),pE=0.3,c_types=c_types)
+vor.b_tension = 1.5
+vor.set_interaction(W = alpha*np.array([[0, 1,vor.b_tension], [1, 0,vor.b_tension],[vor.b_tension,vor.b_tension,0]]),pE=0.3)
 
 # vor.P0 = 3.00
-p0 = 3.80 #3.81
+p0 = 3.83 #3.81
 vor.A0 = 0.86
 vor.P0 = p0*np.sqrt(vor.A0)
 print(vor.P0)
 
-vor.v0 = 1e-2
+vor.v0 = 2e-2
 vor.Dr = 0.01
-vor.kappa_A = 0.2
-vor.kappa_P = 0.1
+real_cells = np.ones(vor.n_c)
+real_cells[vor.n_C:] = 0
+vor.kappa_A = 0.2*real_cells
+vor.kappa_P = 0.1*real_cells
 vor.a = 0.3
 vor.k = 2
 
 
 
-vor.set_t_span(0.025,50)
-vor.simulate()
-vor.cols = "grey", "forestgreen"
-vor.plot_scatter = False
+vor.set_t_span(0.025,15)
+vor.simulate_param()
+
+vor.cols = "red","blue","lightgrey"
+vor.plot_scatter = True
 vor.animate(n_frames=50)
 
-fig, ax = plt.subplots()
-vor.plot_vor(vor.x,ax)
-ax.axis("off")
-fig.savefig("voronoi.pdf")
+"""Seemingly the boundary cells are moving when they shouldn't be. See what is going on"""
+#
+# fig, ax = plt.subplots()
+# vor.plot_vor(vor.x,ax)
+# ax.axis("off")
+# fig.savefig("voronoi.pdf")
 #
 # def image(x,L,res=25):
 #     X,Y = np.meshgrid(np.linspace(0,L,res),np.linspace(0,L,res),indexing="ij")

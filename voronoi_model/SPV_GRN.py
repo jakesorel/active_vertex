@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 vor = Tissue()
 vor.generate_cells(300)
-vor.make_init(7)
+vor.make_init(12)
 alpha = 0.08
 vor.set_interaction(W = alpha*np.array([[0, 1], [1, 0]]),pE=0)
 
@@ -15,18 +15,18 @@ vor.A0 = 0.86
 vor.P0 = p0*np.sqrt(vor.A0)
 print(vor.P0)
 
-vor.v0 = 1e-2
-vor.Dr = 0.01
+vor.v0 = 3e-2
+vor.Dr = 0.1
 vor.kappa_A = 0.2
 vor.kappa_P = 0.1
 vor.a = 0.3
 vor.k = 2
 
-vor.set_t_span(0.025,50)
+vor.set_t_span(0.025,100)
 
 
 ##GRN params
-vor.tau = 30 #this rescales the timescale of the grn wrt the dynamics of the cell movement (NOT your tau)
+vor.tau = 40 #this rescales the timescale of the grn wrt the dynamics of the cell movement (NOT your tau)
 vor.alpha = 1
 vor.p = 2
 vor.K = 0.1
