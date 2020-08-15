@@ -197,30 +197,23 @@ class Tissue:
 
 
 
-        def get_vertex(self,centroids, tri):
+        def get_vertex(self):
             """
             Get vertex locations, given cell centroid positions and triangulation. I.e. calculate the circumcentres of
             each triangle
-
-            :param centroids: Cell coordinates (nc x 2)
-            :param tri: Triangulation (nv x 3)
             :return V: Vertex coordinates (nv x 2)
             """
-            C = centroids[tri]
-            V = circumcenter(C)
+            V = circumcenter(self.Cents)
             return V
 
-        def get_vertex_periodic(self,centroids, tri):
+        def get_vertex_periodic(self):
             """
             Get vertex locations, given cell centroid positions and triangulation. I.e. calculate the circumcentres of
             each triangle
 
-            :param centroids: Cell coordinates (nc x 2)
-            :param tri: Triangulation (nv x 3)
             :return V: Vertex coordinates (nv x 2)
             """
-            C = centroids[tri]
-            V = circumcenter_periodic(C,self.L)
+            V = circumcenter_periodic(self.Cents,self.L)
             return V
 
         def assign_vertices(self):
@@ -398,7 +391,7 @@ class Tissue:
 
 
 
-        def plot_vor_boundary(self,x,ax):
+        def plot_vor_boundary(self,x,ax,tri=False):
             """
             Plot the Voronoi.
 
@@ -406,6 +399,8 @@ class Tissue:
 
             :param x: Cell locations (nc x 2)
             :param ax: matplotlib axis
+            :param tri: Is either a (n_v x 3) np.ndarray of dtype **np.int64** defining the triangulation.
+                Or **False** where the triangulation is not plotted
             """
 
             x = x[~np.isnan(x[:,0])]
@@ -434,6 +429,13 @@ class Tissue:
                 p = PatchCollection(patches, match_original=True)
                 # p.set_array(c_types_print)
                 ax.add_collection(p)
+            if tri is not False:
+                for TRI in tri:
+                    for j in range(3):
+                        a, b = TRI[j], TRI[np.mod(j + 1, 3)]
+                        if (a >= 0) and (b >= 0):
+                            X = np.stack((x[a], x[b])).T
+                            ax.plot(X[0], X[1], color="black")
 
 
 
@@ -511,6 +513,74 @@ class Tissue:
             row_mask = np.append([True], np.any(np.diff(sorted_tri, axis=0), 1))
             return sorted_tri[row_mask]
 
+        def reset_k2s(self):
+            self.k2s = get_k2_boundary(self.tris, self.v_neighbours).ravel()
+            self.v_neighbours_flat = self.v_neighbours.ravel()
+            self.b_neighbour_mask = (self.k2s > 0) * (self.v_neighbours_flat > 0)
+
+        def triangulate(self,x):
+            self.Angles = tri_angles(x, self.tris)
+
+            if type(self.k2s) is list:
+                self._triangulate(x)
+            elif not ((self.Angles[self.v_neighbours_flat, self.k2s] + self.Angles.ravel()) < np.pi)[self.b_neighbour_mask].all():
+                self._triangulate(x)
+            else:
+                self.Cents = x[self.tris]
+                self.vs = self.get_vertex()
+                self.neighbours = self.vs[self.v_neighbours]
+
+
+        def _triangulate(self,x):
+            """
+
+            Calculates the triangulation on the set of points x.
+
+            Stores:
+                self.n_v = number of vertices (int32)
+                self.tris = triangulation of the vertices (nv x 3) matrix.
+                    Cells are stored in CCW order. As a convention, the first entry has the smallest cell id
+                    (Which entry comes first is, in and of itself, arbitrary, but is utilised elsewhere)
+                self.vs = coordinates of each vertex; (nv x 2) matrix
+                self.v_neighbours = vertex ids (i.e. rows of self.vs) corresponding to the 3 neighbours of a given vertex (nv x 3).
+                    In CCW order, where vertex i {i=0..2} is opposite cell i in the corresponding row of self.tris
+                self.neighbours = coordinates of each neighbouring vertex (nv x 3 x 2) matrix
+
+            :param x: (nc x 2) matrix with the coordinates of each cell
+            """
+
+            t = tr.triangulate({"vertices": x},"-n")
+            tri = t["triangles"]
+            neighbours = t["neighbors"]
+
+            b_cells = np.zeros(self.n_c)
+            b_cells[self.n_C:] = 1
+
+            three_b_cell_mask = b_cells[tri].sum(axis=1)==3
+            tri = tri[~three_b_cell_mask]
+
+            neigh_map = np.cumsum(~three_b_cell_mask)-1
+            neigh_map[three_b_cell_mask] = -1
+            neigh_map = np.concatenate((neigh_map,[-1]))
+
+            neighbours = neighbours[~three_b_cell_mask]
+            neighbours = neigh_map[neighbours]
+
+            #6. Store outputs
+            self.tris = tri
+            self.n_v = tri.shape[0]
+            self.Cents = x[self.tris]
+            self.vs = self.get_vertex()
+
+
+            #7. Manually calculate the neighbours. See doc_string for conventions.
+            self.v_neighbours = neighbours
+            self.neighbours = self.vs[neighbours]
+            self.neighbours[neighbours == -1] = np.nan
+
+            self.reset_k2s()
+
+
         def triangulate_periodic(self,x):
             Angles = tri_angles_periodic(x, self.tris, self.L)
             if type(self.k2s) is list:
@@ -520,9 +590,9 @@ class Tissue:
                 self._triangulate_periodic(x)
                 self.k2s = get_k2(self.tris, self.v_neighbours)
             else:
-                self.vs = self.get_vertex_periodic(x,self.tris)
+                self.Cents = x[self.tris]
+                self.vs = self.get_vertex_periodic()
                 self.neighbours = self.vs[self.v_neighbours]
-
 
 
         def _triangulate_periodic(self,x):
@@ -569,71 +639,18 @@ class Tissue:
             #   cell ids, which are transformed by the mod function to account for periodicity. See function for more details
             n_tri = self.remove_repeats(new_tri,n_c)
 
-            #5. Calculate vertex positions, the circumcentre of the three cells. See function doc-string for details
-            V = self.get_vertex_periodic(x,n_tri)
-
             # tri_same = (self.tris == n_tri).all()
 
             #6. Store outputs
             self.n_v = n_tri.shape[0]
-            self.vs = V
             self.tris = n_tri
+            self.Cents = x[self.tris]
+            self.vs = self.get_vertex_periodic()
 
             #7. Manually calculate the neighbours. See doc_string for conventions.
             n_neigh = get_neighbours(n_tri)
             self.v_neighbours = n_neigh
-            self.neighbours = V[n_neigh]
-
-        def _triangulate(self,x):
-            """
-
-            INCOMPLETE DESCRIPTION. FIX XXX
-
-            Calculates the periodic triangulation on the set of points x.
-
-            Stores:
-                self.n_v = number of vertices (int32)
-                self.tris = triangulation of the vertices (nv x 3) matrix.
-                    Cells are stored in CCW order. As a convention, the first entry has the smallest cell id
-                    (Which entry comes first is, in and of itself, arbitrary, but is utilised elsewhere)
-                self.vs = coordinates of each vertex; (nv x 2) matrix
-                self.v_neighbours = vertex ids (i.e. rows of self.vs) corresponding to the 3 neighbours of a given vertex (nv x 3).
-                    In CCW order, where vertex i {i=0..2} is opposite cell i in the corresponding row of self.tris
-                self.neighbours = coordinates of each neighbouring vertex (nv x 3 x 2) matrix
-
-            :param x: (nc x 2) matrix with the coordinates of each cell
-            """
-
-            t = tr.triangulate({"vertices": x},"-n")
-            tri = t["triangles"]
-            neighbours = t["neighbors"]
-
-            b_cells = np.zeros(self.n_c)
-            b_cells[self.n_C:] = 1
-
-            three_b_cell_mask = b_cells[tri].sum(axis=1)==3
-            tri = tri[~three_b_cell_mask]
-
-            neigh_map = np.cumsum(~three_b_cell_mask)-1
-            neigh_map[three_b_cell_mask] = -1
-            neigh_map = np.concatenate((neigh_map,[-1]))
-
-            neighbours = neighbours[~three_b_cell_mask]
-            neighbours = neigh_map[neighbours]
-
-            # #5. Calculate vertex positions, the circumcentre of the three cells. See function doc-string for details
-            V = self.get_vertex(x,tri)
-
-            #6. Store outputs
-            self.n_v = tri.shape[0]
-            self.vs = V
-            self.tris = tri
-
-            #7. Manually calculate the neighbours. See doc_string for conventions.
-            self.v_neighbours = neighbours
-            self.neighbours = V[neighbours]
-            self.neighbours[neighbours == -1] = np.nan
-
+            self.neighbours = self.vs[n_neigh]
 
         def check_boundary(self,x):
             """
@@ -655,12 +672,11 @@ class Tissue:
             :param x: Cell centroids (n_c x 2)
             :return: Updated cell centroids (n_c x 2)
             """
-            Angles = tri_angles(x,self.tris)
             b_cells = np.zeros(self.n_c)
             b_cells[self.n_C:] = 1
             vBC = b_cells[self.tris]
             considered_triangles = vBC.sum(axis=1) == 2
-            add_extra = ((Angles*(1-vBC)>np.pi/2).T*considered_triangles.T).T
+            add_extra = ((self.Angles*(1-vBC)>np.pi/2).T*considered_triangles.T).T
             if add_extra.any():
                 I,J = np.nonzero(add_extra)
                 for k,i in enumerate(I):
@@ -739,7 +755,7 @@ class Tissue:
 
 
 
-        def get_F_periodic(self,x,neighbours,vs):
+        def get_F_periodic(self,neighbours,vs):
             """
             Calculate the forces acting on each cell via the SPV formalism.
 
@@ -754,12 +770,11 @@ class Tissue:
             """
             J_CW = self.J[self.tris, roll_forward(self.tris)]
             J_CCW = self.J[self.tris, roll_reverse(self.tris)]
-            X = x[self.tris]
-            F = get_F_periodic(vs, neighbours, self.tris, self.CV_matrix, self.n_v, self.n_c, self.L, J_CW, J_CCW, self.A, self.P, X, self.kappa_A, self.kappa_P, self.A0, self.P0)
+            F = get_F_periodic(vs, neighbours, self.tris, self.CV_matrix, self.n_v, self.n_c, self.L, J_CW, J_CCW, self.A, self.P, self.Cents, self.kappa_A, self.kappa_P, self.A0, self.P0)
             return F
 
 
-        def get_F_periodic_param(self,x,neighbours,vs):
+        def get_F_periodic_param(self,neighbours,vs):
             """
 
             FIX
@@ -776,12 +791,11 @@ class Tissue:
             """
             J_CW = self.J[self.tris, roll_forward(self.tris)]
             J_CCW = self.J[self.tris, roll_reverse(self.tris)]
-            X = x[self.tris]
-            F = get_F_periodic_param(vs, neighbours, self.tris, self.CV_matrix, self.n_v, self.n_c, self.L, J_CW, J_CCW, self.A, self.P, X, self.kappa_A, self.kappa_P, self.A0, self.P0)
+            F = get_F_periodic_param(vs, neighbours, self.tris, self.CV_matrix, self.n_v, self.n_c, self.L, J_CW, J_CCW, self.A, self.P, self.Cents, self.kappa_A, self.kappa_P, self.A0, self.P0)
             return F
 
 
-        def get_F(self,x,neighbours,vs):
+        def get_F(self,neighbours,vs):
             """
             Identical to **get_F_periodic** but instead accounts for boundaries and neglects periodic triangulation.
 
@@ -801,8 +815,7 @@ class Tissue:
             J[self.n_C:,self.n_C:] = 0
             J_CW = J[self.tris, roll_forward(self.tris)]
             J_CCW = J[self.tris, roll_reverse(self.tris)]
-            X = x[self.tris]
-            F = get_F(vs, neighbours, self.tris, self.CV_matrix, self.n_v, self.n_c, self.L, J_CW, J_CCW, self.A, self.P, X, self.kappa_A, self.kappa_P, self.A0, self.P0,self.n_C,self.kappa_B,self.l_b0)
+            F = get_F(vs, neighbours, self.tris, self.CV_matrix, self.n_v, self.n_c, self.L, J_CW, J_CCW, self.A, self.P, self.Cents, self.kappa_A, self.kappa_P, self.A0, self.P0,self.n_C,self.kappa_B,self.l_b0)
             return F
 
         def simulate(self,print_every=1000,variable_param=False):
@@ -836,24 +849,27 @@ class Tissue:
                 self.triangulate_periodic(x)
                 self.tri_save[i] = self.tris
                 self.assign_vertices()
-                self.Cents = np.array([(self.CV_matrix.T * x[:, 0]).sum(axis=-1), (self.CV_matrix.T * x[:, 1]).sum(axis=-1)]).T
-
                 self.get_A_periodic(self.neighbours,self.vs)
                 self.get_P_periodic(self.neighbours,self.vs)
-                F = F_get(x,self.neighbours,self.vs)
+                F = F_get(self.neighbours,self.vs)
                 F_soft = weak_repulsion(self.Cents,self.a,self.k, self.CV_matrix,self.n_c,self.L)
                 x += self.dt*(F + F_soft + self.v0*self.noise[i])
                 x = np.mod(x,self.L)
                 self.x = x
                 self.x_save[i] = x
+            print("Simulation complete")
             return self.x_save
 
+        def profile_function(self,function):
+            lp = LineProfiler()
+            lp_wrapper = lp(function)
+            lp_wrapper()
+            lp.print_stats()
+            return
 
-        def simulate_boundary(self,print_every=1000,b_extra=1.5):
+        def simulate_boundary(self,print_every=1000,b_extra=4):
             """
             Evolve the SPV but using boundaries.
-
-
 
             Stores:
                 self.x_save = Cell centroids for each time-step (n_t x n_c x 2), where n_t is the number of time-steps
@@ -875,37 +891,22 @@ class Tissue:
             self.x_save = np.ones((n_t,int(self.n_c*b_extra),2))*np.nan
             self.tri_save = -np.ones((n_t,int(self.tris.shape[0]*b_extra),3),dtype=np.int32)
             self.generate_noise_boundary(b_extra=b_extra)
-            n_c0 = self.n_c
             for i in range(n_t):
                 if i % print_every == 0:
                     print(i / n_t * 100, "%")
-                    fig, ax = plt.subplots()
-                    self.plot_vor_boundary(x,ax)
-                    for TRI in self.tris:
-                        for j in range(3):
-                            a,b = TRI[j],TRI[np.mod(j+1,3)]
-                            if (a>=0)and(b>=0):
-                                X = np.stack((x[a],x[b])).T
-                                ax.plot(X[0],X[1],color="black")
-                    fig.savefig("plots/%d.pdf"%i)
-                self._triangulate(x)
+                self.triangulate(x)
                 self.assign_vertices()
                 x = self.check_boundary(x)
                 self.tri_save[i,:self.tris.shape[0]] = self.tris
-                self.Cents = np.array([(self.CV_matrix.T * x[:, 0]).sum(axis=-1), (self.CV_matrix.T * x[:, 1]).sum(axis=-1)]).T
                 self.get_A(self.neighbours,self.vs)
                 self.get_P(self.neighbours,self.vs)
-                F = self.get_F(x,self.neighbours,self.vs)
-
+                F = self.get_F(self.neighbours,self.vs)
                 F_bend = get_F_bend(self.n_c, self.CV_matrix, self.n_C, x, self.zeta)
-                F_soft = weak_repulsion(self.Cents,self.a,self.k, self.CV_matrix,self.n_c,self.L)
-
-                # F_soft = weak_repulsion_boundary(self.Cents,self.a,self.k, self.CV_matrix,self.n_c)
-                #########NOTE SHOULD BE USING ^^^. CHECK
-
-                x += self.dt*(F + F_soft +F_bend + self.v0*self.noise[i,:x.shape[0]])
+                F_soft = weak_repulsion_boundary(self.Cents,self.a,self.k, self.CV_matrix,self.n_c)
+                x += self.dt*(F + F_soft + F_bend + self.v0*self.noise[i,:x.shape[0]])
                 self.x = x
                 self.x_save[i,:x.shape[0]] = x
+            print("Simulation complete")
             return self.x_save
 
 
@@ -959,6 +960,7 @@ class Tissue:
                 else:
                     E = self.GRN_step(self.E_save[i-i_past],E)*(~self.Sender*self.sender_val) + self.Sender * self.sender_val
                 self.E_save[i] = E
+            print("Simulation complete")
             return self.x_save
 
 
@@ -1426,6 +1428,36 @@ def get_k2(tri, v_neighbours):
             k2 = ((v_neighbours[neighbour] == i) * three).sum()
             k2s[i, k] = k2
     return k2s
+
+
+@jit(nopython=True,cache=True)
+def get_k2_boundary(tri, v_neighbours):
+    """
+    Same as **get_k2** but fills in -1 if the k2 neighbour is undefined (-1)
+
+    To determine whether a given neighbouring pair of triangles needs to be re-triangulated, one considers the sum of
+    the pair angles of the triangles associated with the cell centroids that are **not** themselves associated with the
+    adjoining edge. I.e. these are the **opposite** angles.
+
+    Given one cell centroid/angle in a given triangulation, k2 defines the column index of the cell centroid/angle in the **opposite** triangle
+
+    :param tri: Triangulation (n_v x 3) np.int32 array
+    :param v_neighbours: Neighbourhood matrix (n_v x 3) np.int32 array
+    :return:
+    """
+    three = np.array([0, 1, 2])
+    nv = tri.shape[0]
+    k2s = np.empty((nv, 3), dtype=np.int32)
+    for i in range(nv):
+        for k in range(3):
+            neighbour = v_neighbours[i, k]
+            if neighbour == -1:
+                k2s[i,k] = -1
+            else:
+                k2 = ((v_neighbours[neighbour] == i) * three).sum()
+                k2s[i, k] = k2
+    return k2s
+
 
 @jit(nopython=True,cache=True)
 def make_y(x,Lgrid_xy):
