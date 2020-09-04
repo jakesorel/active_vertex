@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numba import jit
 import time
-from scipy.spatial import Voronoi, voronoi_plot_2d
+from scipy.spatial import Voronoi, voronoi_plot_2d,Delaunay
 import os
 from matplotlib import animation
 from line_profiler import LineProfiler
@@ -582,18 +582,80 @@ class Tissue:
 
 
         def triangulate_periodic(self,x):
-            Angles = tri_angles_periodic(x, self.tris, self.L)
+            self.Angles = tri_angles_periodic(x, self.tris, self.L)
             if type(self.k2s) is list:
                 self._triangulate_periodic(x)
                 self.k2s = get_k2(self.tris, self.v_neighbours)
-            elif not ((Angles[self.v_neighbours, self.k2s] + Angles) < np.pi).all():
-                self._triangulate_periodic(x)
-                self.k2s = get_k2(self.tris, self.v_neighbours)
             else:
+                mask = ((self.Angles[self.v_neighbours, self.k2s] + self.Angles) < np.pi)
+                if not mask.all():
+                    self.equiangulate(x,mask)
+                    # self._triangulate_periodic(x)
+
+                    # self.k2s = get_k2(self.tris, self.v_neighbours)
+                else:
+                    self.Cents = x[self.tris]
+                    self.vs = self.get_vertex_periodic()
+                    self.neighbours = self.vs[self.v_neighbours]
+
+        def equiangulate(self,x,mask):
+            """
+
+            Fill this in properly later ...
+
+            Consider the sum of the angles opposite every interface. If this is >180, then equiangulate.
+
+            mask defines the cells/angles for which the sum with a neighbouring cell/angle is >180. These come in pairs
+
+            Equiangulation works by looping through the following, until there exist no such pairs:
+                1. Pick an edge for which the angles > 180. This is defined by "chosen_cell" and "chosen_opposite_cell", which are actually triangles.
+                2. Replace the triangle entries for each of these triangles, such that the edge is swapped from the four cells
+                3. Recompute the neighbours, but only for these two triangles, and their surrounding (4) neighbours (=6)
+                4. Recalculate the angles and the mask and repeat.
+
+            Notes:
+                -- One worry is that equiangulation fails. May be important in the future to include a fail-safe back up of recomputation.
+                -- Would be good to jit this function
+
+            :param x:
+            :param mask:
+            :return:
+            """
+
+            while not mask.all():
+
+                changed_tris,j = np.nonzero(~mask)
+                chosen_cell = changed_tris[0]
+                cell_mask = np.zeros(3,dtype=np.bool)
+                cell_mask[j[0]] = True
+                chosen_opposite_cell = self.v_neighbours[chosen_cell,cell_mask][0]
+
+
+                cells = np.roll(self.tris[chosen_cell],-j[0])
+                opposite_cells = self.tris[chosen_opposite_cell]
+                opposite_cells = np.roll(opposite_cells, - self.k2s[chosen_cell,cell_mask])
+
+
+                self.tris[chosen_cell] = cells[0], opposite_cells[0],cells[2]
+                self.tris[chosen_opposite_cell] = opposite_cells[0],cells[0], opposite_cells[2]
+
+                self.Angles[[chosen_cell,chosen_opposite_cell]] = tri_angles_periodic(x, self.tris[[chosen_cell,chosen_opposite_cell]], self.L)
+                # self.Angles = tri_angles_periodic(x,self.tris,self.L)
                 self.Cents = x[self.tris]
                 self.vs = self.get_vertex_periodic()
-                self.neighbours = self.vs[self.v_neighbours]
 
+
+                modify_neighbours = np.concatenate([self.v_neighbours[chosen_cell],self.v_neighbours[chosen_opposite_cell]])
+                modify_neighbours.sort()
+                self.v_neighbours[modify_neighbours] = -1
+
+
+                n_neigh = get_neighbours(self.tris,self.v_neighbours,Range = modify_neighbours)
+                self.v_neighbours = n_neigh
+                self.neighbours = self.vs[n_neigh]
+
+                self.k2s = get_k2(self.tris, self.v_neighbours)
+                mask = ((self.Angles[self.v_neighbours, self.k2s] + self.Angles) < np.pi)
 
         def _triangulate_periodic(self,x):
             """
@@ -623,6 +685,9 @@ class Tissue:
             #   This triangulation is extracted and saved as tri
             t = tr.triangulate({"vertices": y})
             tri = t["triangles"]
+
+            # Del = Delaunay(y)
+            # tri = Del.simplices
             n_c = x.shape[0]
 
             #3. Find triangles with **at least one** cell within the "true" frame (i.e. with **at least one** "normal cell")
@@ -1183,13 +1248,13 @@ def dhdr(rijk):
                 cx ** 2 + cy ** 2))) / (2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy)) ** 2)
 
         #dhy/drx
-        DHDR[:, i, 1,0] = (bx ** 2 + by ** 2 - cx ** 2 + 2 * ax * (-bx + cx) - cy ** 2) / (
+        DHDR[:, i, 0,1] = (bx ** 2 + by ** 2 - cx ** 2 + 2 * ax * (-bx + cx) - cy ** 2) / (
                     2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy))) - ((by - cy) * (
                     (bx ** 2 + by ** 2) * (ax - cx) + (ax ** 2 + ay ** 2) * (-bx + cx) + (-ax + bx) * (
                         cx ** 2 + cy ** 2))) / (2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy)) ** 2)
 
         #dhx/dry
-        DHDR[:, i, 0, 1] = (-bx ** 2 - by ** 2 + cx ** 2 + 2 * ay * (by - cy) + cy ** 2) / (
+        DHDR[:, i, 1, 0] = (-bx ** 2 - by ** 2 + cx ** 2 + 2 * ay * (by - cy) + cy ** 2) / (
                 2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy))) - ((-bx + cx) * (
                 (ax ** 2 + ay ** 2) * (by - cy) + (bx ** 2 + by ** 2) * (-ay + cy) + (ay - by) * (
                 cx ** 2 + cy ** 2))) / (2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy)) ** 2)
@@ -1202,7 +1267,52 @@ def dhdr(rijk):
 
     return DHDR
 
-
+#
+# # @jit(nopython=True,cache=True)
+# def dhdr_periodic_new(Cents,vs,L):
+#     n_v = Cents.shape[0]
+#     r_dx = roll_forward(np.mod(roll_forward(Cents[:,:,0])-Cents[:,:,0] + L/2,L)-L/2)
+#     r_dy = roll_forward(np.mod(roll_forward(Cents[:,:,1])-Cents[:,:,1] + L/2,L)-L/2)
+#     r_d = np.dstack((r_dx,r_dy))
+#     #Double check this
+#     l = np.sqrt(r_dx**2 + r_dy**2)
+#
+#     lambd = l**2 * (roll_reverse(l**2)+roll_forward(l**2)-l**2)
+#
+#     dl2_drp = np.zeros((n_v,3,3,2))
+#     mult = np.array((0,1,-1))
+#     for i in range(3):
+#         for j in range(2):
+#             dl2_drp[:,i,:,j] = np.outer(r_d[:,i,j],np.roll(mult,i))
+#
+#     dL2_drp = np.zeros((n_v,3,2))
+#     for i in range(2):
+#         dL2_drp[:,:,i] = 2*(roll_forward(r_d[:,:,i])-roll_reverse(r_d[:,:,i]))
+#
+#     dlambd_dr = np.zeros((n_v,3,3,2))
+#     for i in range(3):
+#         for j in range(3):
+#             for k in range(2):
+#                 if i ==j:
+#                     dlambd_dr[:,i,j] = ((2*l[:,j]**2).T * (r_d[:,np.mod(j-1,3)] - r_d[:,np.mod(j+1,3)]).T).T
+#                 if np.mod(i-1,3)==j:
+#                     dlambd_dr[:, i, j] = (-2*(l[:,np.mod(j-1,3)]**2 + l[:,np.mod(j+1,3)]**2 - l[:,j]**2).T*r_d[:,j].T + (2*l[:,j]**2).T * r_d[:,np.mod(j+1,3)].T).T
+#                 if np.mod(i+1,3)==j:
+#                     dlambd_dr[:, i, j] = (2*(l[:,np.mod(j-1,3)]**2 + l[:,np.mod(j+1,3)]**2 - l[:,j]**2).T*r_d[:,j].T - (2*l[:,j]**2).T * r_d[:,np.mod(j-1,3)].T).T
+#
+#     dLambd_dr = (-4*(roll_forward(l)**2 + roll_reverse(l)**2 - l**2).T * r_d.T + 4*(roll_reverse(l)**2 + l**2 - roll_forward(l)**2).T*np.dstack((roll_forward(r_d[:,:,0]),roll_forward(r_d[:,:,1]))).T).T
+#
+#     Lambd = lambd[:,0] + lambd[:,1] + lambd[:,2]
+#
+#     d_lambd_Lambd_dr = np.zeros((n_v,3,3,2))
+#     for i in range(3):
+#         d_lambd_Lambd_dr[:,i] = ((1 / Lambd ** 2) * (Lambd.T * dlambd_dr[:,i].T - lambd[:,i] * dLambd_dr.T)).T
+#
+#     equal_component = Cents[:,np.newaxis,:,np.newaxis,:]*d_lambd_Lambd_dr[:,:,:,:,np.newaxis]
+#     equal_component = equal_component[:,0] + equal_component[:,1] + equal_component[:,2]
+#     unequal_component = ((lambd.T/Lambd).T)[:,:,np.newaxis,np.newaxis]*np.eye(2)[np.newaxis,np.newaxis,:,:]
+#     Dhdr = equal_component + unequal_component
+#     return Dhdr
 
 @jit(nopython=True,cache=True)
 def dhdr_periodic(rijk_,vs,L):
@@ -1235,13 +1345,13 @@ def dhdr_periodic(rijk_,vs,L):
                 cx ** 2 + cy ** 2))) / (2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy)) ** 2)
 
         #dhy/drx
-        DHDR[:, i, 1,0] = (bx ** 2 + by ** 2 - cx ** 2 + 2 * ax * (-bx + cx) - cy ** 2) / (
+        DHDR[:, i, 0,1] = (bx ** 2 + by ** 2 - cx ** 2 + 2 * ax * (-bx + cx) - cy ** 2) / (
                     2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy))) - ((by - cy) * (
                     (bx ** 2 + by ** 2) * (ax - cx) + (ax ** 2 + ay ** 2) * (-bx + cx) + (-ax + bx) * (
                         cx ** 2 + cy ** 2))) / (2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy)) ** 2)
 
         #dhx/dry
-        DHDR[:, i, 0, 1] = (-bx ** 2 - by ** 2 + cx ** 2 + 2 * ay * (by - cy) + cy ** 2) / (
+        DHDR[:, i, 1, 0] = (-bx ** 2 - by ** 2 + cx ** 2 + 2 * ay * (by - cy) + cy ** 2) / (
                 2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy))) - ((-bx + cx) * (
                 (ax ** 2 + ay ** 2) * (by - cy) + (bx ** 2 + by ** 2) * (-ay + cy) + (ay - by) * (
                 cx ** 2 + cy ** 2))) / (2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy)) ** 2)
@@ -1258,7 +1368,7 @@ def dhdr_periodic(rijk_,vs,L):
 
 
 @jit(nopython=True)
-def get_neighbours(tri,neigh=None):
+def get_neighbours(tri,neigh=None,Range=None):
     """
     Given a triangulation, find the neighbouring triangles of each triangle.
 
@@ -1270,11 +1380,13 @@ def get_neighbours(tri,neigh=None):
     :param neigh: neighbourhood matrix to update {Optional}
     :return: (n_v x 3) np.int32 array, storing the three neighbouring triangles. Values correspond to the row numbers of tri
     """
+    n_v = tri.shape[0]
     if neigh is None:
         neigh = np.ones_like(tri,dtype=np.int32)*-1
-    n_v = tri.shape[0]
+    if Range is None:
+        Range = np.arange(n_v)
     tri_compare = np.concatenate((tri.T, tri.T)).T.reshape((-1, 3, 2))
-    for j in range(n_v):
+    for j in Range:#range(n_v):
         tri_sample_flip = np.flip(tri[j])
         tri_i = np.concatenate((tri_sample_flip,tri_sample_flip)).reshape(3,2)
         for k in range(3):
