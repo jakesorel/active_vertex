@@ -4,23 +4,25 @@ import matplotlib.pyplot as plt
 
 
 vor = Tissue()
-vor.generate_cells(400)
-vor.make_init(20,noise = 0)
+vor.generate_cells(600)
+vor.make_init(9,noise = 0.05)
 alpha = 0.04
-vor.set_interaction(W = alpha*np.array([[0, 1], [1, 0]]),pE=0)
+vor.set_interaction(W = alpha*np.array([[0, 1], [1, 0]]),pE=0.3)
 # vor.P0 = 3.00
 p0 = 3.9 #3.81
-vor.A0 = vor.L**2/vor.n_c
-vor.P0 = p0*np.sqrt(vor.A0)
+vor.A0 = 1#0.5*vor.L**2/vor.n_c
+vor.P0 = p0#*np.sqrt(vor.A0)
+
+r = 5
 
 
 print(vor.P0)
 
-vor.v0 = 5e-2
+vor.v0 = 1e-1
 print("v0",vor.v0)
 vor.Dr = 0.1
-vor.kappa_A = 0.2
-vor.kappa_P = 0.1
+vor.kappa_A = 1
+vor.kappa_P = 1/r
 vor.a = 0.3
 vor.k = 1
 
@@ -28,102 +30,209 @@ prop = 0.5
 p0eff = p0*(1-prop*vor.J.max()/(vor.P0*vor.kappa_P))
 
 
-vor.set_t_span(0.025,250)
+vor.set_t_span(0.025,120)
 
 vor.simulate()
-vor.plot_scatter = False
 
-vor.animate(n_frames=50)
-
-vor.profile_function(vor.simulate)
-
-
+shape_index = vor.P/np.sqrt(vor.A)
 fig, ax = plt.subplots()
-vor.plot_vor(vor.x_save[93],ax)
-ax.axis("off")
+ax.hist(shape_index)
+fig.show()
+print(shape_index.mean())
+
+vor.plot_scatter = False
+vor.cols = "purple","pink"
+vor.animate(n_frames=30)
+
+
+vor.get_self_self_interface(100)
+nA,nB = vor.get_num_islands(100)
+
+fig, ax = plt.subplots(1,2)
+ax[0].plot(vor.self_self_interface.mean(axis=1))
+ax[1].plot(nA)
+ax[1].plot(nB)
 fig.show()
 
 
 #
-# def image(x,L,res=25):
-#     X,Y = np.meshgrid(np.linspace(0,L,res),np.linspace(0,L,res),indexing="ij")
-#     XX,YY = X.ravel(),Y.ravel()
-#     d = (np.outer(XX,np.ones_like(x[:,0])) - np.outer(np.ones_like(XX),x[:,0]))**2 + (np.outer(YY,np.ones_like(x[:,1])) - np.outer(np.ones_like(XX),x[:,1]))**2
-#     im = np.empty(XX.shape,dtype=np.int32)
-#     for i, D in enumerate(d):
-#         im[i] = np.argmin(D)
-#     im = im.reshape(X.shape)
-#     return im
+# fig, ax = plt.subplots()
+# vor.plot_vor(vor.x_save[93],ax)
+# ax.axis("off")
+# fig.show()
+
+
 #
-# def type_im(x,L,c_types,res=25):
-#     im = image(x,L,res=res)
-#     tim = c_types[im]
-#     return tim
+def image(x,L,res=25):
+    X,Y = np.meshgrid(np.linspace(0,L,res),np.linspace(0,L,res),indexing="ij")
+    XX,YY = X.ravel(),Y.ravel()
+    d = (np.mod(np.outer(XX, np.ones_like(x[:, 0])) - np.outer(np.ones_like(XX), x[:, 0]) + L / 2, L) - L / 2) ** 2 + (np.mod(np.outer(YY, np.ones_like(x[:, 1])) - np.outer(np.ones_like(XX), x[:, 1]) + L / 2, L)- L / 2) ** 2
+    im = np.empty(XX.shape,dtype=np.int32)
+    for i, D in enumerate(d):
+        im[i] = np.argmin(D)
+    im = im.reshape(X.shape)
+    return im
 
-from scipy.spatial.distance import pdist, squareform
-
-@jit(nopython=True,cache=True)
-def get_radials(res,L):
-    r = np.linspace(L/res,L,res)
-    dx,dy = [],[]
-    th_lengths = []
-    for R in r:
-        theta = np.linspace(0,2*np.pi,int(res*np.sin(R/L)))
-        for th in theta:
-            dx.append(R*np.sin(th))
-            dy.append(R*np.cos(th))
-        th_lengths.append(int(res*np.sin(R/L)))
-    return np.array(dx),np.array(dy),np.array(th_lengths),r
+def type_im(x,L,c_types,res=25):
+    im = image(x,L,res=res)
+    tim = c_types[im]
+    return tim
 
 @jit(nopython=True,cache=True)
-def spatial_autocorr(x,L,c_types,res=25):
-    dx,dy,th_lengths,r = get_radials(res,L)
-    r = r[th_lengths!=0]
-    th_lengths = th_lengths[th_lengths!=0]
-    dxy = np.empty((dx.size,2))
-    dxy[:,0] = dx
-    dxy[:,1] = dy
-    C_types = c_types*2 - 1
-    gr = np.zeros_like(r)
-    for j, xx in enumerate(x):
-        radX = xx + dxy
-        d = (np.mod(np.outer(radX[:,0], np.ones_like(x[:, 0])) - np.outer(np.ones_like(radX[:,0]), x[:, 0])+L/2,L)-L/2) ** 2 + \
-                (np.mod(np.outer(radX[:,1], np.ones_like(x[:, 1])) - np.outer(np.ones_like(radX[:,1]), x[:, 1]) + L/2,L)-L/2) ** 2
-        id = np.empty(radX.shape[0], dtype=np.int32)
-        for i, D in enumerate(d):
-            id[i] = C_types[np.argmin(D)]
-        i = 0
-        for k, th_length in enumerate(th_lengths):
-            id_sample = id[i:th_length+i]
-            id_cell = C_types[j]
-            gr[k] += (id_sample*id_cell).mean()
-            i += th_length
-    gr = gr/C_types.size
-    return gr,r
+def type_im_fast(XX,YY,res,x,L,c_types):
+    d = (np.mod(np.outer(XX, np.ones_like(x[:, 0])) - np.outer(np.ones_like(XX), x[:, 0]) + L / 2, L) - L / 2) ** 2 + (np.mod(np.outer(YY, np.ones_like(x[:, 1])) - np.outer(np.ones_like(XX), x[:, 1]) + L / 2, L)- L / 2) ** 2
+    im = np.empty(XX.shape, dtype=np.int32)
+    for i, D in enumerate(d):
+        im[i] = np.argmin(D)
+    im = im.reshape((res,res))
+    tim = c_types[im.ravel()].reshape((res,res))
+    return tim
+
+@jit(nopython=True,cache=True)
+def get_radial_profile(X,Y,res,x,L,c_types,Dround):
+    tim = type_im_fast(X.ravel(), Y.ravel(), res, x, L, c_types)
+    tim = 2 * tim - 1
+    val = np.outer(tim.ravel(), np.ones_like(tim.ravel())) * np.outer(np.ones_like(tim.ravel()), tim.ravel())
+    tbin = np.bincount(Dround.ravel(), val.ravel())
+    nr = np.bincount(Dround.ravel())
+    radialprofile = tbin / nr
+    return radialprofile
+
+@jit(nopython=True,cache=True)
+def get_radial_profile_type(X,Y,res,x,L,c_types,Dround,ctype=0):
+    """
+    Radial profile but for a specific cell type
+    :param X:
+    :param Y:
+    :param res:
+    :param x:
+    :param L:
+    :param c_types:
+    :param Dround:
+    :param ctype:
+    :return:
+    """
+    tim = type_im_fast(X.ravel(), Y.ravel(), res, x, L, c_types)
+    type_mask = (tim==ctype).ravel()
+    tim = 2 * tim - 1
+    val = np.outer(tim.ravel()[type_mask], np.ones_like(tim.ravel())) * np.outer(np.ones(type_mask.sum()), tim.ravel())
+    tbin = np.bincount(Dround[type_mask].ravel(), val.ravel())
+    nr = np.bincount(Dround[type_mask].ravel())
+    radialprofile = tbin / nr
+    return radialprofile
+
+@jit(nopython=True,cache=True)
+def get_radial_profile_type_norm(X,Y,res,x,L,c_types,Dround):
+    """
+    Radial profile, normalized by the numbers of each cell type (or rather the number of occupied pixels)
+
+    This counteracts artefact in autocorrelation where self-self > 0 as x --> infinity due to unequal cell numbers.
+    :param X:
+    :param Y:
+    :param res:
+    :param x:
+    :param L:
+    :param c_types:
+    :param Dround:
+    :return:
+    """
+    tim = type_im_fast(X.ravel(), Y.ravel(), res, x, L, c_types)
+    type_mask = (tim==0).ravel()
+    tim = 2 * tim - 1
+    val = np.outer(tim.ravel()[type_mask], np.ones_like(tim.ravel())) * np.outer(np.ones(type_mask.sum()), tim.ravel())
+    tbin = np.bincount(Dround[type_mask].ravel(), val.ravel())
+    nr = np.bincount(Dround[type_mask].ravel())
+    radialprofileA = tbin / nr
+    val = np.outer(tim.ravel()[~type_mask], np.ones_like(tim.ravel())) * np.outer(np.ones((~type_mask).sum()), tim.ravel())
+    tbin = np.bincount(Dround[~type_mask].ravel(), val.ravel())
+    nr = np.bincount(Dround[~type_mask].ravel())
+    radialprofileB = tbin / nr
+    return (radialprofileA + radialprofileB)/2
+
+def get_radial_profiles(x_save,skip,mult,L,c_types,res):
+    x_range = (np.arange(res)+0.5)/res*L
+    X,Y = np.meshgrid(x_range,x_range,indexing="ij")
+    dX = np.outer(X.ravel(), np.ones_like(X.ravel())) - np.outer(np.ones_like(X.ravel()), X.ravel())
+    dY = np.outer(Y.ravel(), np.ones_like(Y.ravel())) - np.outer(np.ones_like(Y.ravel()), Y.ravel())
+    dX, dY = np.mod(dX + L / 2, L) - L / 2, np.mod(dY + L / 2, L) - L / 2
+    D = np.sqrt(dX ** 2 + dY ** 2)
+    Dround = (D * mult).astype(int)
+    ds = np.unique(Dround.ravel()) / mult
+
+    radialprofiles = np.zeros((x_save[::skip].shape[0],np.amax(Dround)+1))
+    for i, x in enumerate(x_save[::skip]):
+        radialprofiles[i]=  get_radial_profile(X, Y, res, x, L, c_types, Dround)
+    return radialprofiles,ds
+
+rad,ds = get_radial_profiles(vor.x_save,300,5,vor.L,vor.c_types,res=70)
+plt.imshow(rad.T,extent=[-1,1,-1,1],vmax=0.1,vmin=-0.1)
+plt.show()
+def get_radial_profiles_type(x_save,skip,mult,L,c_types,res):
+    x_range = (np.arange(res)+0.5)/res*L
+    X,Y = np.meshgrid(x_range,x_range,indexing="ij")
+    dX = np.outer(X.ravel(), np.ones_like(X.ravel())) - np.outer(np.ones_like(X.ravel()), X.ravel())
+    dY = np.outer(Y.ravel(), np.ones_like(Y.ravel())) - np.outer(np.ones_like(Y.ravel()), Y.ravel())
+    dX, dY = np.mod(dX + L / 2, L) - L / 2, np.mod(dY + L / 2, L) - L / 2
+    D = np.sqrt(dX ** 2 + dY ** 2)
+    Dround = (D * mult).astype(int)
+    Dmax = np.amax(Dround) + 1
+    ds = np.arange(Dmax)/mult
+
+    radialprofiles = np.zeros((x_save[::skip].shape[0],ds.size))
+    for i, x in enumerate(x_save[::skip]):
+        radialprofiles[i]=  get_radial_profile_type_norm(X, Y, res, x, L, c_types, Dround)
+    return radialprofiles,ds
+
+rad,ds = get_radial_profiles_type(vor.x_save,100,2,vor.L,vor.c_types,res=40)
+plt.imshow(rad.T,extent=[-1,1,-1,1],vmax=0.1,vmin=-0.1)
+plt.show()
+
+"""
+Generates a contour plot for the radial distribution function
+"""
+
+t_sel = vor.t_span[::100]
+TT, DD = np.meshgrid(t_sel,ds)
+
+levels = np.linspace(-0.05,0.05,100)
+rad_mod =rad.copy()
+rad_mod[rad<=levels.min()] = levels.min() +1e-17
+rad_mod[rad>=levels.max()] = levels.max() - 1e-17
+
+plt.tricontourf(TT.ravel(),DD.ravel(),(rad_mod.T).ravel(),levels=levels,cmap=plt.cm.plasma)
+plt.show()
+
+
 
 from scipy.optimize import curve_fit
 
 def corr_fn(r,a,b):
     return np.exp(-a*r)*np.cos(r*np.pi*2/b)
 
-def get_L_star(x,L,c_types,res=25):
-    gr, r = spatial_autocorr(x, L, c_types, res)
-    L_star = curve_fit(corr_fn, r, gr)[0][1]
-    return L_star
+def get_L_star(x_save,skip,mult,L,c_types,res):
+    rads,ds = get_radial_profiles_type(x_save,skip,mult,L,c_types,res)
+    L_stars = np.zeros(rads.shape[0])
+    a,b = L,L
+    for i, rad in enumerate(rads):
+        mask = ~np.isnan(rad)
+        a,b = curve_fit(corr_fn, ds[mask],rad[mask],(a,b),bounds=(np.array([0,0]),np.array([np.inf,np.sqrt(2)*L])))[0]
+        L_stars[i] = b
+    return rads,L_stars
 
-grs = np.array([spatial_autocorr(x, vor.L, vor.c_types, 60)[0] for x in vor.x_save[::100]])
 
-fig, ax = plt.subplots()
-ax.imshow(np.flip(grs.T,axis=0),extent=[-1,1,-1,1],cmap=plt.cm.plasma,vmax=0.2,vmin=-0.2)
-ax.set(xlabel="Time",ylabel="$r$")
-fig.savefig("g(r,t).pdf")
-#
-L_stars = np.array([get_L_star(x,vor.L,vor.c_types,res=100) for x in vor.x_save[0:500:20]])
+
+for res in [20,30,40,50]:
+    rads,L_star = get_L_star(vor.x_save,100,20,vor.L,vor.c_types,res=res)
+    plt.plot(L_star)
+plt.show()
+
+
+rads,L_star = get_L_star(vor.x_save,50,10,vor.L,vor.c_types,res=30)
 
 fig, ax = plt.subplots(figsize=(4,4))
-ax.plot(vor.t_span[0:500:20],L_stars,color="black")
-ax.set(xlabel="Time",ylabel=r"$L_*$"" (Correlation lengthscale)")
-fig.savefig("L_star.pdf")
+ax.plot(L_star)
+ax.set(xlabel="Correlation lengthscale",ylabel="Time")
+fig.show()
 
 #
 # vor.animate(n_frames=50)

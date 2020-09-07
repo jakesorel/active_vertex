@@ -114,7 +114,11 @@ class Tissue:
             """
             self.L = L
             self.x0 = self.hexagonal_lattice(int(np.ceil(self.L/0.5)),int(np.ceil(self.L/np.sqrt(3))),noise=noise)
-            self.x0 = self.x0[self.x0.max(axis=1) < L*0.95]
+            # self.x0 = self.hexagonal_lattice(self.n_c,self.n_c,noise=noise)
+            # self.x0 = self.x0[self.x0.max(axis=1) < L*0.95]
+            self.x0 += 1e-3
+            self.x0 = self.x0[self.x0.max(axis=1) < L*0.97]
+
             self.x = self.x0
             self.n_c = self.x0.shape[0]
             self.n_C = self.n_c
@@ -587,16 +591,20 @@ class Tissue:
                 self._triangulate_periodic(x)
                 self.k2s = get_k2(self.tris, self.v_neighbours)
             else:
-                mask = ((self.Angles[self.v_neighbours, self.k2s] + self.Angles) < np.pi)
-                if not mask.all():
-                    self.equiangulate(x,mask)
-                    # self._triangulate_periodic(x)
-
-                    # self.k2s = get_k2(self.tris, self.v_neighbours)
+                if (self.k2s>=3).sum()!=0:
+                    self._triangulate_periodic(x)
+                    self.k2s = get_k2(self.tris, self.v_neighbours)
                 else:
-                    self.Cents = x[self.tris]
-                    self.vs = self.get_vertex_periodic()
-                    self.neighbours = self.vs[self.v_neighbours]
+                    mask = ((self.Angles[self.v_neighbours, self.k2s] + self.Angles) < np.pi)
+                    if not mask.all():
+                        self.equiangulate(x,mask)
+                        # self._triangulate_periodic(x)
+
+                        # self.k2s = get_k2(self.tris, self.v_neighbours)
+                    else:
+                        self.Cents = x[self.tris]
+                        self.vs = self.get_vertex_periodic()
+                        self.neighbours = self.vs[self.v_neighbours]
 
         def equiangulate(self,x,mask):
             """
@@ -655,7 +663,12 @@ class Tissue:
                 self.neighbours = self.vs[n_neigh]
 
                 self.k2s = get_k2(self.tris, self.v_neighbours)
-                mask = ((self.Angles[self.v_neighbours, self.k2s] + self.Angles) < np.pi)
+                if (self.k2s>=3).sum()!=0:
+                    self._triangulate_periodic(x)
+                    self.k2s = get_k2(self.tris, self.v_neighbours)
+                    mask[:] = True
+                else:
+                    mask = ((self.Angles[self.v_neighbours, self.k2s] + self.Angles) < np.pi)
 
         def _triangulate_periodic(self,x):
             """
