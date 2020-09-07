@@ -630,7 +630,9 @@ class Tissue:
             :return:
             """
 
-            while not mask.all():
+            timeout = 100
+            k = 0
+            while (not mask.all())and(k<timeout):
 
                 changed_tris,j = np.nonzero(~mask)
                 chosen_cell = changed_tris[0]
@@ -669,6 +671,11 @@ class Tissue:
                     mask[:] = True
                 else:
                     mask = ((self.Angles[self.v_neighbours, self.k2s] + self.Angles) < np.pi)
+                k+=1
+            if k == timeout:
+                self._triangulate_periodic(x)
+                self.k2s = get_k2(self.tris, self.v_neighbours)
+
 
         def _triangulate_periodic(self,x):
             """

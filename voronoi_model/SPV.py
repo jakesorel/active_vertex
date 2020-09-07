@@ -6,44 +6,45 @@ import matplotlib.pyplot as plt
 vor = Tissue()
 vor.generate_cells(600)
 vor.make_init(9,noise = 0.05)
-alpha = 0.04
-vor.set_interaction(W = alpha*np.array([[0, 1], [1, 0]]),pE=0.3)
-# vor.P0 = 3.00
-p0 = 3.9 #3.81
-vor.A0 = 1#0.5*vor.L**2/vor.n_c
-vor.P0 = p0#*np.sqrt(vor.A0)
-
+p0 = 3.9
 r = 5
-
-
-print(vor.P0)
-
 vor.v0 = 1e-1
-print("v0",vor.v0)
 vor.Dr = 0.1
+beta = 0.3
+
 vor.kappa_A = 1
 vor.kappa_P = 1/r
+vor.A0 = 1
+vor.P0 = p0
 vor.a = 0.3
 vor.k = 1
+
+
+vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),pE=0.5)
+
+
+vor.set_t_span(0.025,50)
+
+vor.simulate()
+
+
+
+vor.plot_scatter = False
+vor.animate(n_frames=30)
+
+
+
 
 prop = 0.5
 p0eff = p0*(1-prop*vor.J.max()/(vor.P0*vor.kappa_P))
 
 
-vor.set_t_span(0.025,120)
-
-vor.simulate()
 
 shape_index = vor.P/np.sqrt(vor.A)
 fig, ax = plt.subplots()
 ax.hist(shape_index)
 fig.show()
 print(shape_index.mean())
-
-vor.plot_scatter = False
-vor.cols = "purple","pink"
-vor.animate(n_frames=30)
-
 
 vor.get_self_self_interface(100)
 nA,nB = vor.get_num_islands(100)
