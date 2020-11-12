@@ -1076,7 +1076,7 @@ class Tissue:
             lp.print_stats()
             return
 
-        def simulate_boundary(self,print_every=1000):
+        def simulate_boundary(self,print_every=1000,do_F_bound=True):
             """
             Evolve the SPV but using boundaries.
 
@@ -1099,25 +1099,42 @@ class Tissue:
             self.x = x.copy()
             self.x_save = np.ones((n_t,int(self.n_c*self.b_extra),2))*np.nan
             self.tri_save = -np.ones((n_t,int(self.tris.shape[0]*self.b_extra),3),dtype=np.int32)
-            self.generate_noise_boundary(b_extra=self.b_extra)
-            for i in range(n_t):
-                if i % print_every == 0:
-                    print(i / n_t * 100, "%")
-                self.triangulate(x,recalc_angles=True)
-                self.assign_vertices()
-                x = self.check_boundary(x)
-                self.tri_save[i,:self.tris.shape[0]] = self.tris
-                self.get_A(self.neighbours,self.vs)
-                self.get_P(self.neighbours,self.vs)
-                F = self.get_F(self.neighbours,self.vs)
-                # F_bend = get_F_bend(self.n_c, self.CV_matrix, self.n_C, x, self.zeta)
-                F_soft = weak_repulsion_boundary(self.Cents,self.a,self.k, self.CV_matrix,self.n_c,self.n_C)
-                F_bound = boundary_tension(self.Gamma_bound,self.n_C,self.n_c,self.Cents,self.CV_matrix)
-                x += self.dt*(F + F_soft + self.v0*self.noise[i,:x.shape[0]] + F_bound)
-                              # + F_bend + F_bound
+            self.generate_noise_boundary()
+            if do_F_bound is True:
+                for i in range(n_t):
+                    if i % print_every == 0:
+                        print(i / n_t * 100, "%")
+                    self.triangulate(x,recalc_angles=True)
+                    self.assign_vertices()
+                    x = self.check_boundary(x)
+                    self.tri_save[i,:self.tris.shape[0]] = self.tris
+                    self.get_A(self.neighbours,self.vs)
+                    self.get_P(self.neighbours,self.vs)
+                    F = self.get_F(self.neighbours,self.vs)
+                    # F_bend = get_F_bend(self.n_c, self.CV_matrix, self.n_C, x, self.zeta)
+                    F_soft = weak_repulsion_boundary(self.Cents,self.a,self.k, self.CV_matrix,self.n_c,self.n_C)
+                    F_bound = boundary_tension(self.Gamma_bound,self.n_C,self.n_c,self.Cents,self.CV_matrix)
+                    x += self.dt*(F + F_soft + self.v0*self.noise[i,:x.shape[0]] + F_bound)
+                                  # + F_bend + F_bound
 
-                self.x = x
-                self.x_save[i,:x.shape[0]] = x
+                    self.x = x
+                    self.x_save[i,:x.shape[0]] = x
+            else:
+                for i in range(n_t):
+                    if i % print_every == 0:
+                        print(i / n_t * 100, "%")
+                    self.triangulate(x, recalc_angles=True)
+                    self.assign_vertices()
+                    x = self.check_boundary(x)
+                    self.tri_save[i, :self.tris.shape[0]] = self.tris
+                    self.get_A(self.neighbours, self.vs)
+                    self.get_P(self.neighbours, self.vs)
+                    F = self.get_F(self.neighbours, self.vs)
+                    F_soft = weak_repulsion_boundary(self.Cents, self.a, self.k, self.CV_matrix, self.n_c, self.n_C)
+                    x += self.dt * (F + F_soft + self.v0 * self.noise[i, :x.shape[0]])
+
+                    self.x = x
+                    self.x_save[i, :x.shape[0]] = x
             print("Simulation complete")
             return self.x_save
 
