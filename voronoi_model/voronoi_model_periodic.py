@@ -64,6 +64,12 @@ class Tissue:
 
             self.cols = "red","blue"
             self.plot_scatter = True
+            self.cell_movement_mask = None
+            self.no_noise_time = None
+            self.b_extra = 2
+
+
+            self.plot_forces = False
 
         def generate_cells(self,n_c):
             """
@@ -157,7 +163,7 @@ class Tissue:
 
 
 
-        def set_interaction(self,W = 0.16*np.array([[2, 0.5], [0.5, 2]]),pE = 0.5,c_types=None):
+        def set_interaction(self,W = 0.16*np.array([[2, 0.5], [0.5, 2]]),pE = 0.5,c_types=None,randomize=True):
             if c_types is None:
                 nE = int(self.n_C*pE)
                 N_dict = {"E": nE, "T": self.n_C - nE,}
@@ -168,7 +174,8 @@ class Tissue:
                     j1 = N_dict[c_type]
                     c_types[j:j + j1] = k
                     j += j1
-                np.random.shuffle(c_types)
+                if randomize is True:
+                    np.random.shuffle(c_types)
 
             if self.n_c!=self.n_C:
                 c_types = np.concatenate((c_types,np.repeat(-1,self.n_c-self.n_C)))
@@ -179,9 +186,43 @@ class Tissue:
             self.c_types = c_types
 
 
-        def set_interaction_boundary(self,W = 0.16*np.array([[2, 0.5], [0.5, 2]]),pE = 0.5):
+        def set_interaction_boundary(self,W = 0.16*np.array([[2, 0.5], [0.5, 2]]),pE = 0.5,Wb = [0.16,0.16],b_extra = 3):
+            self.b_extra = b_extra
+
             nE = int(self.n_C*pE)
             N_dict = {"E": nE, "T": self.n_C - nE}
+
+            c_types = np.zeros(self.n_C, dtype=np.int32)
+            j = 0
+            for k, c_type in enumerate(N_dict):
+                j1 = N_dict[c_type]
+                c_types[j:j + j1] = k
+                j += j1
+            np.random.shuffle(c_types)
+
+            c_types_all = np.concatenate((c_types,np.repeat(-1,self.n_c-self.n_C)))
+
+            cell_i, cell_j = np.meshgrid(c_types, c_types, indexing="ij")
+            J = W[cell_i, cell_j]
+            self.J = J
+            self.c_types = c_types
+            self.c_types_all = c_types_all
+
+
+            #Save a larger matrix from which to sample. This defines the interaction strengths of cells with the boundary
+            self.J_large = np.zeros((self.n_c*self.b_extra,self.n_c*self.b_extra))
+            for i, c_type in enumerate(self.c_types):
+                self.J_large[i] = Wb[c_type]
+                self.J_large[:,i] = Wb[c_type]
+            self.J_large[:self.n_C,:self.n_C] = self.J
+
+
+
+        def set_interaction_boundary_ETX(self,W = 0.16*np.array([[2, 0.5], [0.5, 2]]),pE = 0.3,pX=0.3):
+            nE = int(self.n_C*pE)
+            nX = int(self.n_C*pX)
+
+            N_dict = {"E": nE, "T": self.n_C-nE-nX,"X":pX}
 
             c_types = np.zeros(self.n_C, dtype=np.int32)
             j = 0
@@ -442,7 +483,6 @@ class Tissue:
                             ax.plot(X[0], X[1], color="black")
 
 
-
         def plot_vor_colored(self,x,ax,cmap):
             """
             Plot the Voronoi.
@@ -485,12 +525,16 @@ class Tissue:
 
         def generate_noise(self):
             theta_noise = np.cumsum(np.random.normal(0, np.sqrt(2 * self.Dr * self.dt), (self.n_t, self.n_c)), axis=0)
-            self.noise = np.dstack((np.sin(theta_noise), np.sin(theta_noise)))
+            self.noise = np.dstack((np.cos(theta_noise), np.sin(theta_noise)))
+            if self.cell_movement_mask is not None:
+                self.noise[:,~self.cell_movement_mask] = self.noise[:,~self.cell_movement_mask]*0
+            if self.no_noise_time is not None:
+                self.noise[:self.no_noise_time] = 0*self.noise[:self.no_noise_time]
 
-        def generate_noise_boundary(self,b_extra):
-            n_c_extra = int(self.n_c*b_extra)
+        def generate_noise_boundary(self):
+            n_c_extra = int(self.n_c*self.b_extra)
             theta_noise = np.cumsum(np.random.normal(0, np.sqrt(2 * self.Dr * self.dt), (self.n_t, self.n_C)), axis=0)
-            noise_cells = np.dstack((np.sin(theta_noise), np.sin(theta_noise)))
+            noise_cells = np.dstack((np.cos(theta_noise), np.sin(theta_noise)))
             noise = np.zeros((self.n_t,n_c_extra,2))
             noise[:,:self.n_C]= noise_cells
             self.noise = noise
@@ -522,13 +566,17 @@ class Tissue:
             self.v_neighbours_flat = self.v_neighbours.ravel()
             self.b_neighbour_mask = (self.k2s > 0) * (self.v_neighbours_flat > 0)
 
-        def triangulate(self,x):
+        def triangulate(self,x,recalc_angles=False):
             self.Angles = tri_angles(x, self.tris)
 
             if type(self.k2s) is list:
                 self._triangulate(x)
+                if recalc_angles is True:
+                    self.Angles = tri_angles(x, self.tris)
             elif not ((self.Angles[self.v_neighbours_flat, self.k2s] + self.Angles.ravel()) < np.pi)[self.b_neighbour_mask].all():
                 self._triangulate(x)
+                if recalc_angles is True:
+                    self.Angles = tri_angles(x, self.tris)
             else:
                 self.Cents = x[self.tris]
                 self.vs = self.get_vertex()
@@ -767,27 +815,103 @@ class Tissue:
                 for k,i in enumerate(I):
                     j = J[k]
                     xs = x[self.tris[i]]
-                    xs = np.roll(xs, -j, axis=0)
-                    perp = np.array([-xs[1,1]+xs[2,1],xs[1,0]-xs[2,0]])
-                    perp = perp/np.sqrt((perp**2).sum())
-                    d = np.cross(xs[2]-xs[0],xs[1]-xs[0])/np.sqrt(((xs[2]-xs[1])**2).sum())
-                    x_new = xs[0] -2*d*perp
+                    re = xs[np.mod(j-1,3)] - xs[np.mod(j+1,3)]
+                    re = re/np.linalg.norm(re)
+                    re = np.array([re[1],-re[0]])
+                    rpe = xs[j]
+                    x_new = 2*np.dot(xs[np.mod(j-1,3)]-rpe,re)*re + rpe
                     x = np.vstack((x,x_new))
                 self.n_c = x.shape[0]
                 self._triangulate(x)
                 self.assign_vertices()
 
-            #Remove extra cells
-            C = get_C(self.n_c,self.CV_matrix)
-            # C = ((C + C.T)==1).astype(np.int32) #<-- should this be uncommented??
-            keep_mask = C[self.n_C:, :self.n_C].sum(axis=1)>0 #I'm assuming this is the same thing. This removes all boundary centroids that are not connected to at least one real centroid.
-            if keep_mask.any():
-                c_keep = np.nonzero(keep_mask)[0]
+            C = get_C_boundary(self.n_c,self.CV_matrix)
+            #
+            # #Remove extra cells
+            # keep_mask = C[self.n_C:, :self.n_C].sum(axis=1)>0 #I'm assuming this is the same thing. This removes all boundary centroids that are not connected to at least one real centroid.
+            # if keep_mask.any():
+            #     c_keep = np.nonzero(keep_mask)[0]
+            #     x = np.concatenate((x[:self.n_C],x[c_keep + self.n_C]))
+            #     self.n_c = x.shape[0]
+            #     self._triangulate(x)
+            #     self.assign_vertices()
+            #
+
+            #Remove all boundary particles not connected to exactly two other boundary particles
+            remove_mask = C[self.n_C:, self.n_C:].sum(axis=1)!=2
+            if remove_mask.any():
+                c_keep = np.nonzero(~remove_mask)[0]
                 x = np.concatenate((x[:self.n_C],x[c_keep + self.n_C]))
                 self.n_c = x.shape[0]
                 self._triangulate(x)
                 self.assign_vertices()
+                self.Angles = tri_angles(x, self.tris)
+            #
+            # remove_mask = C[self.n_C:, self.n_C:].sum(axis=1)==0
+            # if remove_mask.any():
+            #     c_keep = np.nonzero(~remove_mask)[0]
+            #     x = np.concatenate((x[:self.n_C],x[c_keep + self.n_C]))
+            #     self.n_c = x.shape[0]
+            #     self._triangulate(x)
+            #     self.assign_vertices()
+            #     self.Angles = tri_angles(x, self.tris)
+
+
             return x
+
+        #
+        # def check_boundary(self,x):
+        #       ##ARCHIVE
+        #     """
+        #     For a non-periodic simulation using boundary particles, dynamically update the number/position of particles
+        #     to preserve cell shape continuity while also minimizing the number of boundary particles.
+        #
+        #     Provided the cell aggregate is completely contiguous, then **check_boundary** ensures boundary particles
+        #     form a single ring (i.e. where, within the set of triangles featuring two boundary cells, each boundary cell
+        #     is represented in two such triangles)
+        #
+        #     Performs two steps.
+        #
+        #     1. Add extra boundary cells. Calculate the angle that "real" cells make with pairs of boundary cells (within triangulation).
+        #         Reflect the "real" cell over the line made by the pair of boundary cells if this angle > 90 degs
+        #
+        #     2. Remove extra cells.
+        #         Remove boundary cells that are not connected to at least one "real" cell.
+        #
+        #     :param x: Cell centroids (n_c x 2)
+        #     :return: Updated cell centroids (n_c x 2)
+        #     """
+        #     b_cells = np.zeros(self.n_c)
+        #     b_cells[self.n_C:] = 1
+        #     vBC = b_cells[self.tris]
+        #     considered_triangles = vBC.sum(axis=1) == 2
+        #     add_extra = ((self.Angles*(1-vBC)>np.pi/2).T*considered_triangles.T).T
+        #     if add_extra.any():
+        #         I,J = np.nonzero(add_extra)
+        #         for k,i in enumerate(I):
+        #             j = J[k]
+        #             xs = x[self.tris[i]]
+        #             xs = np.roll(xs, -j, axis=0)
+        #             perp = np.array([-xs[1,1]+xs[2,1],xs[1,0]-xs[2,0]])
+        #             perp = perp/np.sqrt((perp**2).sum())
+        #             d = np.cross(xs[2]-xs[0],xs[1]-xs[0])/np.sqrt(((xs[2]-xs[1])**2).sum())
+        #             x_new = xs[0] -2*d*perp
+        #             x = np.vstack((x,x_new))
+        #         self.n_c = x.shape[0]
+        #         self._triangulate(x)
+        #         self.assign_vertices()
+        #
+        #     #Remove extra cells
+        #     C = get_C(self.n_c,self.CV_matrix)
+        #     # C = ((C + C.T)==1).astype(np.int32) #<-- should this be uncommented??
+        #     keep_mask = C[self.n_C:, :self.n_C].sum(axis=1)>0 #I'm assuming this is the same thing. This removes all boundary centroids that are not connected to at least one real centroid.
+        #     if keep_mask.any():
+        #         c_keep = np.nonzero(keep_mask)[0]
+        #         x = np.concatenate((x[:self.n_C],x[c_keep + self.n_C]))
+        #         self.n_c = x.shape[0]
+        #         self._triangulate(x)
+        #         self.assign_vertices()
+        #     return x
 
         def get_P(self,neighbours, vs):
             """
@@ -895,9 +1019,9 @@ class Tissue:
             :param vs: Positions of vertices (n_v x 2)
             :return: F
             """
-            J = np.ones((self.n_c,self.n_c))*self.b_tension
-            J[:self.n_C,:self.n_C] = self.J
-            J[self.n_C:,self.n_C:] = 0
+            J = self.J_large[:self.n_c,:self.n_c]
+            # J[:self.n_C,:self.n_C] = self.J
+            # J[self.n_C:,self.n_C:] = 0
             J_CW = J[self.tris, roll_forward(self.tris)]
             J_CCW = J[self.tris, roll_reverse(self.tris)]
             F = get_F(vs, neighbours, self.tris, self.CV_matrix, self.n_v, self.n_c, self.L, J_CW, J_CCW, self.A, self.P, self.Cents, self.kappa_A, self.kappa_P, self.A0, self.P0,self.n_C,self.kappa_B,self.l_b0)
@@ -952,7 +1076,7 @@ class Tissue:
             lp.print_stats()
             return
 
-        def simulate_boundary(self,print_every=1000,b_extra=4):
+        def simulate_boundary(self,print_every=1000):
             """
             Evolve the SPV but using boundaries.
 
@@ -973,22 +1097,25 @@ class Tissue:
             self.assign_vertices()
             x = self.check_boundary(x)
             self.x = x.copy()
-            self.x_save = np.ones((n_t,int(self.n_c*b_extra),2))*np.nan
-            self.tri_save = -np.ones((n_t,int(self.tris.shape[0]*b_extra),3),dtype=np.int32)
-            self.generate_noise_boundary(b_extra=b_extra)
+            self.x_save = np.ones((n_t,int(self.n_c*self.b_extra),2))*np.nan
+            self.tri_save = -np.ones((n_t,int(self.tris.shape[0]*self.b_extra),3),dtype=np.int32)
+            self.generate_noise_boundary(b_extra=self.b_extra)
             for i in range(n_t):
                 if i % print_every == 0:
                     print(i / n_t * 100, "%")
-                self.triangulate(x)
+                self.triangulate(x,recalc_angles=True)
                 self.assign_vertices()
                 x = self.check_boundary(x)
                 self.tri_save[i,:self.tris.shape[0]] = self.tris
                 self.get_A(self.neighbours,self.vs)
                 self.get_P(self.neighbours,self.vs)
                 F = self.get_F(self.neighbours,self.vs)
-                F_bend = get_F_bend(self.n_c, self.CV_matrix, self.n_C, x, self.zeta)
-                F_soft = weak_repulsion_boundary(self.Cents,self.a,self.k, self.CV_matrix,self.n_c)
-                x += self.dt*(F + F_soft + F_bend + self.v0*self.noise[i,:x.shape[0]])
+                # F_bend = get_F_bend(self.n_c, self.CV_matrix, self.n_C, x, self.zeta)
+                F_soft = weak_repulsion_boundary(self.Cents,self.a,self.k, self.CV_matrix,self.n_c,self.n_C)
+                F_bound = boundary_tension(self.Gamma_bound,self.n_C,self.n_c,self.Cents,self.CV_matrix)
+                x += self.dt*(F + F_soft + self.v0*self.noise[i,:x.shape[0]] + F_bound)
+                              # + F_bend + F_bound
+
                 self.x = x
                 self.x_save[i,:x.shape[0]] = x
             print("Simulation complete")
@@ -1193,7 +1320,7 @@ class Tissue:
             return num_boundaries
 
 
-        def animate(self,n_frames = 100,file_name=None, dir_name="plots",an_type="periodic"):
+        def animate(self,n_frames = 100,file_name=None, dir_name="plots",an_type="periodic",tri=False):
             """
             Animate simulation, saving to mp4.
 
@@ -1216,7 +1343,16 @@ class Tissue:
             skip = int((self.x_save.shape[0])/n_frames)
             def animate(i):
                 ax1.cla()
-                plot_fn(self.x_save[skip*i],ax1)
+                if tri is True:
+                    plot_fn(self.x_save[skip*i],ax1,tri=self.tri_save[skip*i])
+                else:
+                    plot_fn(self.x_save[skip*i],ax1,tri=False)
+                if self.plot_forces is True:
+                    x = self.x_save[skip*i]
+                    mask = ~np.isnan(self.x_save[skip*i,:,0]) * ~np.isnan(self.x_save[skip*i+1,:,0])
+                    x = x[mask]
+                    F = self.x_save[skip*i+1,mask] - self.x_save[skip*i,mask]
+                    ax1.quiver(x[:,0],x[:,1],F[:,0],F[:,1])
                 ax1.set(aspect=1, xlim=(0, self.L), ylim=(0, self.L))
 
             Writer = animation.writers['ffmpeg']
@@ -1740,7 +1876,9 @@ def get_P(vs,neighbours,CV_matrix,n_c):
 
     PP_mat = np.zeros(P_m.shape)
     for i in range(3):
-        PP_mat[:, i] = (P_m[:, np.mod(i + 1, 3)] + P_m[:, np.mod(i + 2, 3)]) / 2
+        PP_mat[:, i] = P_m[:, np.mod(i + 2, 3)]
+
+        # PP_mat[:, i] = (P_m[:, np.mod(i + 1, 3)] + P_m[:, np.mod(i + 2, 3)]) / 2
 
     PP_flat = PP_mat.ravel()
     PP_flat[np.isnan(PP_flat)] = 0
@@ -1823,60 +1961,60 @@ def get_F_periodic(vs, neighbours,tris,CV_matrix,n_v,n_c,L,J_CW,J_CCW,A,P,X,kapp
 
     return F
 
-
-@jit(nopython=True,cache=True)
-def get_F_periodic_param(vs, neighbours,tris,CV_matrix,n_v,n_c,L,J_CW,J_CCW,A,P,X,kappa_A,kappa_P,A0,P0):
-
-    h_j = np.empty((n_v, 3, 2))
-    for i in range(3):
-        h_j[:, i] = vs
-    h_jm1 = np.dstack((roll_forward(neighbours[:,:,0]),roll_forward(neighbours[:,:,1])))
-    h_jp1 = np.dstack((roll_reverse(neighbours[:,:,0]),roll_reverse(neighbours[:,:,1])))
-
-
-    dAdh_j = np.mod(h_jp1 - h_jm1 + L / 2, L) - L / 2
-    dAdh_j = np.dstack((dAdh_j[:,:,1],-dAdh_j[:,:,0]))
-
-    l_jm1 = np.mod(h_j - h_jm1 + L / 2, L) - L / 2
-    l_jp1 = np.mod(h_j - h_jp1 + L / 2, L) - L / 2
-    l_jm1_norm, l_jp1_norm = np.sqrt(l_jm1[:,:,0] ** 2 + l_jm1[:,:,1] ** 2), np.sqrt(l_jp1[:,:,0] ** 2 +  l_jp1[:,:,1] ** 2)
-    dPdh_j = (l_jm1.T/l_jm1_norm.T + l_jp1.T/l_jp1_norm.T).T
-
-    dljidh_j = (l_jm1.T * J_CCW.T/l_jm1_norm.T + l_jp1.T * J_CW.T/l_jp1_norm.T).T
-
-
-    ## 3. Find areas and perimeters of the cells and restructure data wrt. the triangulation
-    vA = A[tris.ravel()].reshape(tris.shape)
-    vP = P[tris.ravel()].reshape(tris.shape)
-    vKa = kappa_A[tris.ravel()].reshape(tris.shape)
-    vKp = kappa_P[tris.ravel()].reshape(tris.shape)
-    # 4. Calculate ∂h/∂r. This is for cell i (which may or may not be cell j, and triangulates with cell j)
-    # This last two dims are a Jacobinan (2x2) matrix, defining {x,y} for h and r. See function description for details
-    DHDR = dhdr_periodic(X, vs, L)  # order is wrt cell i
-
-    # 5. Now calculate the force component for each vertex, with respect to the 3 neighbouring cells
-    #   This is essentially decomposing the chain rule of the expression of F for each cell by vertex
-    #   M_sum is a (nv,2,3) matrix. This is the force contribution for each cell of a given triangle/vertex (3rd dim). Considering {x,y} components (2nd dim)
-    #       Within the function, this calculates (direct and indirect) contributions of each cell wrt each other cell (i.e. 3x3), then adds them together
-    M = np.zeros((2, n_v, 2, 3))
-    for i in range(3):
-        for j in range(3):
-            for Fdim in range(2):
-                M[:, :, Fdim, i] += DHDR[:, i, Fdim].T * \
-                                    (vKa[:,j] * (vA[:, j] - A0) * dAdh_j[:, j].T
-                                     + vKp[:,j] * (vP[:, j]-P0) * dPdh_j[:, j].T
-                                     + dljidh_j[:,j].T)
-    M = M[0] + M[1]
-
-
-    # 6. Compile force components wrt. cells by using the cell-to-vertex connection matrix.
-    #       Force on cell_i = SUM_{vertices of cell i} {forces at each vertex wrt. cell i}
-    dEdr = np.zeros((n_c, 2))
-    for i in range(3):
-        dEdr += np.asfortranarray(CV_matrix[:, :, i])@np.asfortranarray(M[:, :, i])
-    F = -dEdr
-
-    return F
+#
+# @jit(nopython=True,cache=True)
+# def get_F_periodic_param(vs, neighbours,tris,CV_matrix,n_v,n_c,L,J_CW,J_CCW,A,P,X,kappa_A,kappa_P,A0,P0):
+#
+#     h_j = np.empty((n_v, 3, 2))
+#     for i in range(3):
+#         h_j[:, i] = vs
+#     h_jm1 = np.dstack((roll_forward(neighbours[:,:,0]),roll_forward(neighbours[:,:,1])))
+#     h_jp1 = np.dstack((roll_reverse(neighbours[:,:,0]),roll_reverse(neighbours[:,:,1])))
+#
+#
+#     dAdh_j = np.mod(h_jp1 - h_jm1 + L / 2, L) - L / 2
+#     dAdh_j = np.dstack((dAdh_j[:,:,1],-dAdh_j[:,:,0]))
+#
+#     l_jm1 = np.mod(h_j - h_jm1 + L / 2, L) - L / 2
+#     l_jp1 = np.mod(h_j - h_jp1 + L / 2, L) - L / 2
+#     l_jm1_norm, l_jp1_norm = np.sqrt(l_jm1[:,:,0] ** 2 + l_jm1[:,:,1] ** 2), np.sqrt(l_jp1[:,:,0] ** 2 +  l_jp1[:,:,1] ** 2)
+#     dPdh_j = (l_jm1.T/l_jm1_norm.T + l_jp1.T/l_jp1_norm.T).T
+#
+#     dljidh_j = (l_jm1.T * J_CCW.T/l_jm1_norm.T + l_jp1.T * J_CW.T/l_jp1_norm.T).T
+#
+#
+#     ## 3. Find areas and perimeters of the cells and restructure data wrt. the triangulation
+#     vA = A[tris.ravel()].reshape(tris.shape)
+#     vP = P[tris.ravel()].reshape(tris.shape)
+#     vKa = kappa_A[tris.ravel()].reshape(tris.shape)
+#     vKp = kappa_P[tris.ravel()].reshape(tris.shape)
+#     # 4. Calculate ∂h/∂r. This is for cell i (which may or may not be cell j, and triangulates with cell j)
+#     # This last two dims are a Jacobinan (2x2) matrix, defining {x,y} for h and r. See function description for details
+#     DHDR = dhdr_periodic(X, vs, L)  # order is wrt cell i
+#
+#     # 5. Now calculate the force component for each vertex, with respect to the 3 neighbouring cells
+#     #   This is essentially decomposing the chain rule of the expression of F for each cell by vertex
+#     #   M_sum is a (nv,2,3) matrix. This is the force contribution for each cell of a given triangle/vertex (3rd dim). Considering {x,y} components (2nd dim)
+#     #       Within the function, this calculates (direct and indirect) contributions of each cell wrt each other cell (i.e. 3x3), then adds them together
+#     M = np.zeros((2, n_v, 2, 3))
+#     for i in range(3):
+#         for j in range(3):
+#             for Fdim in range(2):
+#                 M[:, :, Fdim, i] += DHDR[:, i, Fdim].T * \
+#                                     (vKa[:,j] * (vA[:, j] - A0) * dAdh_j[:, j].T
+#                                      + vKp[:,j] * (vP[:, j]-P0) * dPdh_j[:, j].T
+#                                      + dljidh_j[:,j].T)
+#     M = M[0] + M[1]
+#
+#
+#     # 6. Compile force components wrt. cells by using the cell-to-vertex connection matrix.
+#     #       Force on cell_i = SUM_{vertices of cell i} {forces at each vertex wrt. cell i}
+#     dEdr = np.zeros((n_c, 2))
+#     for i in range(3):
+#         dEdr += np.asfortranarray(CV_matrix[:, :, i])@np.asfortranarray(M[:, :, i])
+#     F = -dEdr
+#
+#     return F
 
 
 @jit(nopython=True,cache=True)
@@ -1900,17 +2038,25 @@ def get_F(vs, neighbours,tris,CV_matrix,n_v,n_c,L,J_CW,J_CCW,A,P,X,kappa_A,kappa
     dljidh_j = (l_jm1.T * J_CCW.T/l_jm1_norm.T + l_jp1.T * J_CW.T/l_jp1_norm.T).T
 
 
+
+
     ## 3. Find areas and perimeters of the cells and restructure data wrt. the triangulation
-    vA = A[tris.ravel()].reshape(tris.shape)
-    vP = P[tris.ravel()].reshape(tris.shape)
+    # vA = A[tris.ravel()].reshape(tris.shape)
+    # vP = P[tris.ravel()].reshape(tris.shape)
+
+
+    real_cell = np.zeros(n_c)
+    real_cell[:n_C] = 1
+
+    vdA = ((A-A0)*real_cell)[tris.ravel()].reshape(tris.shape)
+    vdP = ((P-P0)*real_cell)[tris.ravel()].reshape(tris.shape)
 
     # 4. Calculate ∂h/∂r. This is for cell i (which may or may not be cell j, and triangulates with cell j)
     # This last two dims are a Jacobinan (2x2) matrix, defining {x,y} for h and r. See function description for details
     DHDR = dhdr(X)  # order is wrt cell i
 
-    real_cell = np.zeros(n_c)
-    real_cell[:n_C] = 1
     vRC = real_cell[tris.ravel()].reshape(tris.shape)
+    bEdge = vRC*roll_forward(1-vRC) + (1-vRC)*roll_forward(vRC) + vRC*roll_reverse(1-vRC) + (1-vRC)*roll_reverse(vRC)
 
     # 5. Now calculate the force component for each vertex, with respect to the 3 neighbouring cells
     #   This is essentially decomposing the chain rule of the expression of F for each cell by vertex
@@ -1921,11 +2067,13 @@ def get_F(vs, neighbours,tris,CV_matrix,n_v,n_c,L,J_CW,J_CCW,A,P,X,kappa_A,kappa
         for j in range(3):
             for Fdim in range(2):
                 M[:, :, Fdim, i] += DHDR[:, i, Fdim].T * \
-                                    (kappa_A * (vA[:, j] - A0) * vRC[:,j] * dAdh_j[:, j].T
-                                     + kappa_P * (vP[:, j]-P0) * vRC[:,j] * dPdh_j[:, j].T
+                                    (kappa_A * vdA[:,j] * dAdh_j[:, j].T
+                                     + kappa_P * vdP[:,j] * dPdh_j[:, j].T
                                      + vRC[:,j]*dljidh_j[:,j].T
-                                    + kappa_B*(1-vRC[:,j])*(l_jp1_norm[:,j] - l_b0)*dPdh_j[:,j].T)
+                                     # + dljidh_j[:, j].T
+                                     + kappa_B*bEdge[:,j]*(l_jp1_norm[:,j] - l_b0)*dPdh_j[:,j].T)
     M = M[0] + M[1]
+
 
     M_flat = M.ravel()
     M_flat[np.isnan(M_flat)] = 0
@@ -2030,7 +2178,7 @@ def get_l_interface_boundary(n_v,n_c, neighbours, vs, CV_matrix):
     return LI
 
 @jit(nopython=True,cache=True)
-def weak_repulsion_boundary(Cents,a,k, CV_matrix,n_c):
+def weak_repulsion_boundary(Cents,a,k, CV_matrix,n_c,n_C):
     """
     Identical to **weak_repulsion** apart from without periodic boundary conditions
 
@@ -2059,7 +2207,24 @@ def weak_repulsion_boundary(Cents,a,k, CV_matrix,n_c):
     F_soft = np.zeros((n_c, 2))
     for i in range(3):
         F_soft += np.asfortranarray(CV_matrix[:, :, i])@np.asfortranarray(V_soft[:, i])
+    F_soft[n_C:] = 0
     return F_soft
+@jit(nopython=True,cache=True)
+
+def boundary_tension(Gamma_bound,n_C,n_c,Cents,CV_matrix):
+    boundary_cells = np.zeros(n_c)
+    boundary_cells[n_C:] = 1
+    CCW = np.dstack((roll_reverse(Cents[:,:,0]),roll_reverse(Cents[:,:,1])))#np.column_stack((Cents[:,1:3],Cents[:,0].reshape(-1,1,2)))
+    CW = np.dstack((roll_forward(Cents[:,:,0]),roll_forward(Cents[:,:,1])))#np.column_stack((Cents[:,1:3],Cents[:,0].reshape(-1,1,2)))
+    CCW_displacement = Cents - CCW
+    CW_displacement = Cents - CW
+
+    forces = -CW_displacement - CCW_displacement
+    F_boundary = np.zeros((n_c, 2))
+    for i in range(3):
+        F_boundary += np.asfortranarray(CV_matrix[:, :, i])@np.asfortranarray(forces[:,i])
+    F_boundary[:n_C] = 0
+    return Gamma_bound*F_boundary
 
 @jit(nopython=True,cache=True)
 def get_C(n_c,CV_matrix):
@@ -2078,6 +2243,28 @@ def get_C(n_c,CV_matrix):
     C = np.zeros((n_c, n_c), dtype=np.float32)
     for i in range(3):
         C += np.asfortranarray(CV_matrix[:, :, i]) @ np.asfortranarray(CV_matrix[:, :, np.mod(i + 2, 3)].T)
+    C = (C != 0).astype(np.int32)
+    return C
+
+
+@jit(nopython=True,cache=True)
+def get_C_boundary(n_c,CV_matrix):
+    """
+    Generates a cell-cell interaction matrix (binary) (n_c x n_c).
+
+    If entry C[i,j] is 1, means that cell j is the CW neighbour of cell i in one of the triangles of the triangulation
+
+    Note: if the triangulation is not periodic, this directionality will result in asymmetric entries of rows/cols
+    associated with boundary cells. To generate a symmetric interaction matrix, perform (C + C.T)!=0
+
+    :param n_c: Number of cells **np.int64**
+    :param CV_matrix: Cell-vertex matrix representation of triangulation (n_c x n_v x 3)
+    :return:
+    """
+    C = np.zeros((n_c, n_c), dtype=np.float32)
+    for i in range(3):
+        C += np.asfortranarray(CV_matrix[:, :, i]) @ np.asfortranarray(CV_matrix[:, :, np.mod(i + 2, 3)].T)
+        C += np.asfortranarray(CV_matrix[:, :, i]) @ np.asfortranarray(CV_matrix[:, :, np.mod(i + 1, 3)].T)
     C = (C != 0).astype(np.int32)
     return C
 
@@ -2113,7 +2300,7 @@ def get_F_bend(n_c,CV_matrix,n_C,x,zeta):
 
     dC_ri, dC_rj,dC_rk = dcosthetadr(x_i,x_j,x_k)
 
-    F_b = -zeta *(dC_ri
+    F_b = zeta *(dC_ri
                   + np.asfortranarray(C_b) @ np.asfortranarray(dC_rj)
                   + np.asfortranarray(C_b.T) @ np.asfortranarray(dC_rk))
 
@@ -2121,6 +2308,33 @@ def get_F_bend(n_c,CV_matrix,n_C,x,zeta):
     F_bend[n_C:] = F_b
 
     return F_bend
+#
+# @jit(nopython=True,cache=True)
+# def dcosthetadr(ri,rj,rk):
+#     """
+#     If cos(theta_i) = (r_{ji}•r_{ki})/(|r_{ji}||r_{ki}|)
+#
+#     then this function calculates:
+#         \partial cos(theta_i) / \partial r_i (denoted in short hand dC_ri)
+#         \partial cos(theta_i) / \partial r_j (denoted in short hand dC_rj)
+#         \partial cos(theta_i) / \partial r_k (denoted in short hand dC_rk)
+#
+#     :param ri: Array of positions of boundary cell i (n_c - n_C x 2)
+#     :param rj: Array positions of neighbours of i (j) (n_c - n_C x 2)
+#     :param rk: Array of positions of the other neighbour of i (k) (n_c - n_C x 2)
+#     :return: dC_ri, dC_rj,dC_rk
+#     """
+#     rjk = rj - rk
+#     rji = rj - ri
+#     rki = rk - ri
+#     L2_ji = rji[:,0]** 2 + rji[:,1]**2
+#     L2_ki = rki[:,0]**2 + rki[:,1]**2
+#     cos_theta = (rji[:,0]*rki[:,0]+ rji[:,1]*rki[:,1])/(np.sqrt(L2_ji)*np.sqrt(L2_ki))
+#     dC_ri = (rji.T/L2_ji) * (cos_theta - np.sqrt(L2_ji/L2_ki)) + (rki.T/L2_ki) * (cos_theta - np.sqrt(L2_ki/L2_ji))
+#     dC_rj = (rji.T/L2_ji) * (cos_theta + np.sqrt(L2_ji/L2_ki)) - rjk.T
+#     dC_rk = (rki.T/L2_ki) * (cos_theta + np.sqrt(L2_ki/L2_ji)) + rjk.T
+#     return dC_ri.T, dC_rj.T,dC_rk.T
+#
 
 @jit(nopython=True,cache=True)
 def dcosthetadr(ri,rj,rk):
@@ -2137,13 +2351,15 @@ def dcosthetadr(ri,rj,rk):
     :param rk: Array of positions of the other neighbour of i (k) (n_c - n_C x 2)
     :return: dC_ri, dC_rj,dC_rk
     """
+    rij = ri-rj
     rjk = rj - rk
-    rji = rj - ri
     rki = rk - ri
-    L2_ji = rji[:,0]** 2 + rji[:,1]**2
-    L2_ki = rki[:,0]**2 + rki[:,1]**2
-    cos_theta = (rji[:,0]*rki[:,0]+ rji[:,1]*rki[:,1])/(np.sqrt(L2_ji)*np.sqrt(L2_ki))
-    dC_ri = (rji.T/L2_ji) * (cos_theta - np.sqrt(L2_ji/L2_ki)) + (rki.T/L2_ki) * (cos_theta - np.sqrt(L2_ki/L2_ji))
-    dC_rj = (rji.T/L2_ji) * (cos_theta + np.sqrt(L2_ji/L2_ki)) - rjk.T
-    dC_rk = (rki.T/L2_ki) * (cos_theta + np.sqrt(L2_ki/L2_ji)) + rjk.T
+    nij = np.sqrt(rij[:,0]** 2 + rij[:,1]**2)
+    njk = np.sqrt(rjk[:,0]** 2 + rjk[:,1]**2)
+    nki = np.sqrt(rki[:,0]** 2 + rki[:,1]**2)
+
+    dC_ri = (1/(2*nij*nki))*((rij.T/nij**2)*(nki**2 - njk**2 - nki**2)
+                             - (rki.T/nki**2)*(nij**2 - njk**2 - nki**2))
+    dC_rj = (1/(2*nij**3 * nki)*((rij.T * (njk**2 - nki**2)) + (nij**2 * (rjk.T - rki.T))))
+    dC_rk = (1/(2*nki**3 * nij)* ((rki.T * (-njk**2 + nij**2) + (nki**2 * (rij.T - rjk.T)))))
     return dC_ri.T, dC_rj.T,dC_rk.T

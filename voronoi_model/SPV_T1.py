@@ -1,15 +1,16 @@
 from voronoi_model.voronoi_model_periodic import *
 import numpy as np
 import matplotlib.pyplot as plt
+import collections
 
 
 vor = Tissue()
 vor.generate_cells(600)
-vor.make_init(9,noise = 0.05)
-p0 = 3.5
+vor.make_init(7,noise = 0.05)
+p0 = 3.9
 r = 5
-vor.v0 = 5e-2
-vor.Dr = 1e-2
+vor.v0 = 1e-1
+vor.Dr = 1e-1
 beta = 0.01#0.1
 
 vor.kappa_A = 1
@@ -20,17 +21,174 @@ vor.a = 0.3
 vor.k = 1
 
 
-vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),pE=0.5,randomize=False)
+vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),pE=0.5,randomize=True)
 
 
-vor.set_t_span(0.025,100)
+
+vor.cell_movement_mask = np.zeros_like(vor.c_types,dtype=np.bool)
+
+vor.set_t_span(0.025,200)
+vor.no_noise_time = 30
+vor._triangulate_periodic(vor.x)
+opposites,adjacents,different = False,False,False
+while not opposites&adjacents&different:
+    tri_i = int(np.random.random()*vor.tris.shape[0])
+    Tri = vor.tris[tri_i]
+    other_tri_mask = np.zeros(vor.tris.shape[0],dtype=np.bool)
+    for i in range(3):
+        mask = np.sum(vor.tris - np.roll(np.flip(Tri),i)==0,axis=1)==2
+        other_tri_mask += mask
+    other_tri_i = np.nonzero(other_tri_mask)[0][2] #arbitrarily pick the 3rd
+    other_tri = vor.tris[other_tri_i]
+    countdict = collections.Counter(np.dstack((other_tri,Tri)).ravel())
+
+    for i, val in enumerate(countdict):
+        if countdict[val] ==1:
+            id = np.nonzero(Tri==val)[0]
+            if id.size!=0:
+                Tri = np.roll(Tri,-id)
+            id = np.nonzero(other_tri==val)[0]
+            if id.size!=0:
+                other_tri = np.roll(other_tri,-id)
+
+    opposites = vor.c_types[Tri[0]] == vor.c_types[other_tri[0]]
+    adjacents = vor.c_types[Tri[1]] == vor.c_types[Tri[2]]
+    different = vor.c_types[Tri[0]] != vor.c_types[Tri[1]]
+
+
+t1cells = set(list(Tri)).union(set(list(other_tri)))
+vor.cell_movement_mask[Tri[0]] = True
+vor.cell_movement_mask[other_tri[0]] = True
+labelled_cell_type = vor.c_types[Tri[0]]
+vor.c_types *=0
+vor.c_types[Tri[0]],vor.c_types[other_tri[0]] = 1,1
+vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),pE=0.5,randomize=True,c_types=vor.c_types)
+
 
 vor.simulate()
 
+vor.cell_movement_mask[list(t1cells)] = True
+vor.c_types[vor.cell_movement_mask] = vor.c_types[vor.cell_movement_mask] + 2
 
-
+vor.cols = "red","blue","orange","green"
 vor.plot_scatter = False
-vor.animate(n_frames=100)
+vor.animate(n_frames=30)
+
+
+def get_unique_rows(A,B):
+       """https://stackoverflow.com/questions/8317022/get-intersecting-rows-across-two-2d-numpy-arrays"""
+       nrows, ncols = A.shape
+       dtype={'names':['f{}'.format(i) for i in range(ncols)],
+              'formats':ncols * [A.dtype]}
+       C = np.setdiff1d(A.view(dtype), B.view(dtype))
+       C = C.view(A.dtype).reshape(-1, ncols)
+       return C
+
+
+
+def get_T1s(A,B):
+    C = get_unique_rows(A,B)
+    #
+    # #bodge -- get rid of cases where there are multiple swaps in an iteration
+    # cdict = collections.Counter(C.ravel())
+    # for val in cdict:
+    #     if cdict[val]!=2:
+    #         C = C[np.where((C!=val).all(axis=1))[0]]
+
+    #1. Group into pairs
+    Grouped = np.zeros((int(C.shape[0]/2),2,3)).astype(int)
+    j = 0
+
+    for i in range(3):
+       z = np.absolute(C[:,np.newaxis] - np.roll(np.flip(C,axis=1),i,axis=1))==0
+       find_shared = np.array(np.nonzero(np.nansum(z,axis=2)==2)).T
+       find_shared = find_shared[find_shared[:,0]<find_shared[:,1]]
+       n = find_shared.shape[0]
+       Grouped[j:j+n,0],Grouped[j:j+n,1] = C[find_shared[:,0]],C[find_shared[:,1]]
+       j += n
+
+    #2. Find the corresponding pairs in B
+
+    BGrouped = np.zeros_like(Grouped)
+    for k in range(Grouped.shape[0]):
+        group = Grouped[k]
+        countdict = collections.Counter(group.ravel())
+        countmat = np.zeros((4,2)).astype(int)
+        for i, val in enumerate(countdict):
+               countmat[i] = val,countdict[val]
+        edge_cells = countmat[countmat[:,1]==1,0]
+        for i in range(2):
+               for edge_cell in edge_cells:
+                     id = np.nonzero(group[i] == edge_cell)[0]
+                     if id.size is not 0:
+                            group[i] = np.roll(group[i],-id)
+        bgroup = np.array([[group[0,0],group[0,1],group[1,0]],
+                           [group[1,0],group[1,1],group[0,0]]])
+        BGrouped[k] = bgroup
+
+    return Grouped, BGrouped
+
+
+dt = 1
+t_span = np.arange(100,vor.tri_save.shape[0]-dt,dt).astype(int)
+t1_counts = np.zeros_like(t_span)
+t1_cells = []
+for i, t in enumerate(t_span):
+       try:
+           Grouped,BGrouped=get_T1s(vor.tri_save[t], vor.tri_save[t+dt])
+           t1_counts[i] = Grouped.shape[0]
+           t1_cells.append(Grouped)
+       except ValueError:
+           t1_counts[i] = 0
+
+pmt = 20
+t_eval = np.arange(-pmt,pmt+1).astype(int)
+
+fig, ax = plt.subplots()
+
+for i, T1_cell in enumerate(t1_cells):
+    if T1_cell.size is not 0:
+        for t1_cell in T1_cell:
+            t1_cell = t1_cell.reshape((2,3))
+            opposites = vor.c_types[t1_cell[0,0]]==vor.c_types[t1_cell[1,0]]
+            adjacents = vor.c_types[t1_cell[0,1]]==vor.c_types[t1_cell[0,2]]
+            different = vor.c_types[t1_cell[0,0]]!=vor.c_types[t1_cell[0,1]]
+            if opposites&adjacents&different:
+                print("yes")
+                kappa_A = np.zeros(vor.n_c)
+                kappa_P = np.zeros(vor.n_c)
+                kappa_A[np.unique(t1_cell)] = 1
+                kappa_P[np.unique(t1_cell)] = 1 / r
+                # kappa_A = np.ones(vor.n_c)
+                # kappa_P = np.ones(vor.n_c)/r
+                J = vor.J.copy()
+                J[:,list(set(list(np.arange(vor.n_c))).difference(set(np.unique(t1_cell))))] = 0
+                T_eval = t_eval + t_span[i]
+                energies = np.zeros_like(T_eval,dtype=np.float64)
+                for j, t in enumerate(T_eval):
+                    vor.tris = vor.tri_save[t]
+                    vor.x = vor.x_save[t]
+                    vor.assign_vertices()
+                    vor.Cents = vor.x[vor.tris]
+                    vor.vs = vor.get_vertex_periodic()
+                    n_neigh = get_neighbours(vor.tris)
+                    vor.v_neighbours = n_neigh
+                    vor.neighbours = vor.vs[vor.v_neighbours]
+                    A = vor.get_A_periodic(vor.neighbours,vor.vs)
+                    P = vor.get_P_periodic(vor.neighbours,vor.vs)
+                    l_int = get_l_interface(vor.n_v, vor.n_c, vor.neighbours, vor.vs, vor.CV_matrix, vor.L)
+                    energy = np.sum(kappa_A*(A-vor.A0)**2) + np.sum(kappa_P*(P-vor.P0)**2) + np.sum(l_int*J)
+                    energies[j] = energy
+                ax.plot(t_eval,energies)
+ax.set(ylabel="Energy",xlabel="Time")
+fig.show()
+
+
+"""
+Here what we want to do is identify T1 transitions and track the energy before and after them 
+
+
+"""
 
 
 #
