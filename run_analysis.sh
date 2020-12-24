@@ -10,4 +10,4 @@
 
 source activate self-organisation-mouse
 
-python voronoi_model/cluster_analysis.py "$1"
+python voronoi_model/cluster_analysis.py "$1" "$2" "$3"
