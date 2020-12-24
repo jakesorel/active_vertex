@@ -18,11 +18,10 @@ def run_simulation(X):
     vor.L = 9
 
 
-    p0 = 3.6
     r = 5
-    vor.v0 = 5e-2
+    vor.v0 = v0
     vor.Dr = 1e-1
-    beta = 0.01#0.1
+    beta = beta
 
     vor.kappa_A = 1
     vor.kappa_P = 1/r

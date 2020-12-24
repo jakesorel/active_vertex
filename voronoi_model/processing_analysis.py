@@ -1,16 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
-N = 8
+N = 10
 rep = 8
 # p0_range = np.linspace(3.5, 4, N)
 # v0_range = np.linspace(5e-3, 1e-1, N)
 # beta_range = np.linspace(0, 0.3)
 p0_range = np.linspace(3.5, 4, N)
 v0_range = np.linspace(5e-3, 1e-1, N)
-beta_range = np.linspace(0, 0.3, N)
+beta_range = np.logspace(-3, -1, N)
 rep_range = np.arange(rep)
 PP, VV, BB,RR = np.meshgrid(p0_range, v0_range, beta_range,rep_range, indexing="ij")
-ID_mat = np.arange(8**3).astype(int).reshape(8,8,8)
+ID_mat = np.arange(N**3).astype(int).reshape(N,N,N)
 ID_mat = np.stack([ID_mat for i in range(rep)],axis=3)
 
 # PP,VV,BB = PP[:,:,:8],VV[:,:,:8],BB[:,:,:8]
