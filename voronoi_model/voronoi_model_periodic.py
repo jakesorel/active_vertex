@@ -44,7 +44,7 @@ class Tissue:
             self.vs = []
             self.tris = []
 
-            self.A0 = 0.86
+            self.A0 = 1
             self.P0 = 3.4641
             self.kappa_A = 1
             self.kappa_P = 1
@@ -83,7 +83,7 @@ class Tissue:
             self.cells = [Cell() for i in range(n_c)]
             return self.cells
 
-        def hexagonal_lattice(self,rows=3, cols=3, noise=0.0005):
+        def hexagonal_lattice(self,rows=3, cols=3, noise=0.0005, A = None):
             """
             Assemble a hexagonal lattice
 
@@ -101,6 +101,8 @@ class Tissue:
                    y += np.random.normal(0,noise)
                    points.append((x, y))
             points = np.asarray(points)
+            if A is not None:
+                points = points * np.sqrt(2*np.sqrt(3)/3)
             return points
 
 
@@ -124,10 +126,39 @@ class Tissue:
             # self.x0 = self.x0[self.x0.max(axis=1) < L*0.95]
             self.x0 += 1e-3
             self.x0 = self.x0[self.x0.max(axis=1) < L*0.97]
-
             self.x = self.x0
             self.n_c = self.x0.shape[0]
             self.n_C = self.n_c
+
+
+
+        def make_init_balanced(self,L,noise=0.005):
+            """
+            Make initial condition. Currently, this is a hexagonal lattice + noise
+
+            Makes reference to the self.hexagonal_lattice function, then crops down to the reference frame
+
+            Stores:
+                self.n_c = number of cells
+                self.x0 = (nc x 2) matrix denoting cell coordinates
+                self.x = clone of self.x0
+
+            :param L: Domain size/length (np.float32)
+            :param noise: Gaussian noise added to {x,y} coordinates (np.float32)
+            """
+            self.L = L
+            self.x0 = self.hexagonal_lattice(int(self.L),int(np.ceil(self.L)),noise=noise,A = self.A0)
+            # self.x0 = self.hexagonal_lattice(self.n_c,self.n_c,noise=noise)
+            # self.x0 = self.x0[self.x0.max(axis=1) < L*0.95]
+            self.x0 += 1e-3
+            np.argsort(self.x0.max(axis=1))
+
+            self.x0 = self.x0[np.argsort(self.x0.max(axis=1))[:int(self.L**2/self.A0)]]
+            self.x = self.x0
+            self.n_c = self.x0.shape[0]
+            self.n_C = self.n_c
+
+
 
         def make_init_boundary(self,L,r,noise=0.005):
             self.make_init(L,noise=noise)
@@ -391,7 +422,7 @@ class Tissue:
             return new_regions, np.asarray(new_vertices)
 
 
-        def plot_vor(self,x,ax):
+        def plot_vor(self,x,ax,tri=False):
             """
             Plot the Voronoi.
 
@@ -433,6 +464,14 @@ class Tissue:
                 p = PatchCollection(patches, match_original=True)
                 # p.set_array(c_types_print)
                 ax.add_collection(p)
+            if tri is not False:
+                for TRI in tri:
+                    for j in range(3):
+                        a, b = TRI[j], TRI[np.mod(j + 1, 3)]
+                        if (a >= 0) and (b >= 0):
+                            X = np.stack((x[a], x[b])).T
+                            ax.plot(X[0], X[1], color="black")
+
 
 
 
@@ -524,7 +563,7 @@ class Tissue:
 
 
         def generate_noise(self):
-            theta_noise = np.cumsum(np.random.normal(0, np.sqrt(2 * self.Dr * self.dt), (self.n_t, self.n_c)), axis=0)
+            theta_noise = np.cumsum(np.random.normal(0, np.sqrt(2 * self.Dr * self.dt), (self.n_t, self.n_c)), axis=0) + np.random.uniform(0,np.pi*2,self.n_c)
             self.noise = np.dstack((np.cos(theta_noise), np.sin(theta_noise)))
             if self.cell_movement_mask is not None:
                 self.noise[:,~self.cell_movement_mask] = self.noise[:,~self.cell_movement_mask]*0

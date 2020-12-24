@@ -2,15 +2,24 @@ from voronoi_model.voronoi_model_periodic import *
 import numpy as np
 import matplotlib.pyplot as plt
 
-
+li = 0
+dir_name = "lattices"
+x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
+c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,li)).astype(np.int64)
 vor = Tissue()
 vor.generate_cells(600)
-vor.make_init_balanced(9,noise = 0.0005)
-p0 = 3.7
-r = 10
-vor.v0 = 0
+vor.x = x
+vor.x0 = vor.x
+vor.n_c = vor.x0.shape[0]
+vor.n_C = vor.n_c
+vor.L = 9
+
+
+p0 = 3.6
+r = 5
+vor.v0 = 5e-2
 vor.Dr = 1e-1
-beta = 0.1#0.1
+beta = 0.01#0.1
 
 vor.kappa_A = 1
 vor.kappa_P = 1/r
@@ -19,7 +28,7 @@ vor.P0 = p0
 vor.a = 0.3
 vor.k = 1
 
-vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),pE=0,randomize=True)
+vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
 
 
 vor.set_t_span(0.025,100)
@@ -28,6 +37,8 @@ vor.simulate()
 
 vor.plot_scatter = False
 vor.animate(n_frames=30)
+
+
 
 
 
