@@ -2,9 +2,9 @@
 
 #Submit this script with: sbatch thefilename
 
-#SBATCH --time=0:30:00   # walltime
+#SBATCH --time=2:00:00   # walltime
 #SBATCH --ntasks=1   # number of processor cores (i.e. tasks)
-#SBATCH -J "AV_jakecs"   # job name
+#SBATCH -J "active_vertex"   # job name
 #SBATCH --output=output.out
 #SBATCH --error=output.out
 
