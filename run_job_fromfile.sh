@@ -8,6 +8,7 @@
 #SBATCH --output=output.out
 #SBATCH --error=output.out
 
+
 source activate apical_domain
 
 python voronoi_model/SPV_from_file_cluster.py "$1" "$2" "$3"
