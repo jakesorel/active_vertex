@@ -103,9 +103,11 @@ if __name__ == "__main__":
 
     def do_analysis(Id):
         for i in range(int(sys.argv[3])):
+            ##Fixing an earlier error to prevent re-runs. Can remove from here
             try:
-                analysis = np.load("analysis_fsorted/%d_%d.npz" % (Id, i))["arr_0"]
+                analysis = np.load("analysis_fsorted/%d_%d.npz" % (Id, i))
             except ValueError:
+                ## to here
                 try:
                     tri_save = np.load("tri_save_fsorted/%d_%d.npz" % (Id,i))["arr_0"]
                     tri_save = tri_save.reshape(tri_save.shape[0], -1, 3)
