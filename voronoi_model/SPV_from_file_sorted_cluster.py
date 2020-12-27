@@ -77,13 +77,15 @@ if __name__ == "__main__":
     for repn in range(rep):
         # run_simulation((p0, v0, beta, Id, repn))
         try:
-            tri_save = np.load("tri_save_fsorted/%d_%d.npz" % (Id, repn))
-            x_save = np.load("x_save_fsorted/%d_%d.npz" % (Id, repn))
-            c_types = np.load("c_types_fsorted/%d_%d.npz" % (Id, repn))
-        except FileNotFoundError:
-            run_simulation((p0, v0, beta, Id, repn))
+            tri_save = np.load("tri_save_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
+            x_save = np.load("x_save_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
+            c_types = np.load("c_types_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
+        except ValueError or FileNotFoundError:
+            for repnn in range(repn,rep):
+                run_simulation((p0, v0, beta, Id, repnn))
         if filesize_max("x_save_fsorted/%d_%d.npz"% (Id, repn),22400000):
-            run_simulation((p0, v0, beta, Id, repn))
+            for repnn in range(repn,rep):
+                run_simulation((p0, v0, beta, Id, repnn))
 
 
 
