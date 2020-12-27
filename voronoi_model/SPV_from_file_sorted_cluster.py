@@ -83,9 +83,9 @@ if __name__ == "__main__":
         except ValueError or FileNotFoundError:
             for repnn in range(repn,rep):
                 run_simulation((p0, v0, beta, Id, repnn))
-        if filesize_max("x_save_fsorted/%d_%d.npz"% (Id, repn),22400000):
-            for repnn in range(repn,rep):
-                run_simulation((p0, v0, beta, Id, repnn))
+        # if filesize_max("x_save_fsorted/%d_%d.npz"% (Id, repn),22400000):
+        #     for repnn in range(repn,rep):
+        #         run_simulation((p0, v0, beta, Id, repnn))
 
 
 

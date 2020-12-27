@@ -77,6 +77,48 @@ def get_L_star(x_save,skip,mult,L,c_types,res):
     return rads,L_stars
 
 
+def run_simulation(X):
+    p0, v0, beta, Id,rep = X
+    li = rep
+    dir_name = "lattices"
+    x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
+    c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,li)).astype(np.int64)
+    vor = Tissue()
+    vor.generate_cells(600)
+    vor.x = x
+    vor.x0 = vor.x
+    vor.n_c = vor.x0.shape[0]
+    vor.n_C = vor.n_c
+    vor.L = 9
+
+
+    r = 5
+    vor.v0 = v0
+    vor.Dr = 1e-1
+    beta = beta
+
+    vor.kappa_A = 1
+    vor.kappa_P = 1/r
+    vor.A0 = 1
+    vor.P0 = p0
+    vor.a = 0.3
+    vor.k = 1
+
+    A_mask = vor.x[:, 0] < vor.L / 2
+    c_types = np.zeros(vor.n_c, dtype=np.int64)
+    c_types[~A_mask] = 1
+    vor.set_interaction(W=(2 * beta * vor.P0 / r) * np.array([[0, 1], [1, 0]]), pE=0.5, c_types=c_types)
+
+    vor.set_t_span(0.025,500)
+
+    vor.simulate()
+
+    np.savez_compressed("tri_save_fsorted/%d_%d.npz"%(Id,rep),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
+    np.savez_compressed("x_save_fsorted/%d_%d.npz"%(Id,rep),vor.x_save.reshape(vor.n_t,2*vor.n_c))
+    np.savez_compressed("c_types_fsorted/%d_%d.npz"%(Id,rep),vor.c_types)
+
+
+
 
 if __name__ == "__main__":
 
@@ -102,6 +144,14 @@ if __name__ == "__main__":
     # vor.n_t = vor.t_span.size
 
     def do_analysis(Id):
+        N = int(sys.argv[2])
+        rep = int(sys.argv[3])
+        p0_range = np.linspace(3.5, 4, N)
+        v0_range = np.linspace(5e-3, 1e-1, N)
+        beta_range = np.logspace(-3, -1, N)
+
+        PP, VV, BB = np.meshgrid(p0_range, v0_range, beta_range, indexing="ij")
+        p0, v0, beta = PP.take(Id), VV.take(Id), BB.take(Id)
         for i in range(int(sys.argv[3])):
             ##Fixing an earlier error to prevent re-runs. Can remove from here
             try:
@@ -115,24 +165,33 @@ if __name__ == "__main__":
                     x_save = x_save.reshape(x_save.shape[0], -1, 2)
                     c_types = np.load("c_types_fsorted/%d_%d.npz" % (Id,i))["arr_0"]
 
-                    vor.n_t = tri_save.shape[0]
-                    vor.n_c = x_save.shape[1]
-                    vor.n_v = tri_save.shape[1]
+                except:
+                    run_simulation((p0, v0, beta, Id, i))
+                    tri_save = np.load("tri_save_fsorted/%d_%d.npz" % (Id,i))["arr_0"]
+                    tri_save = tri_save.reshape(tri_save.shape[0], -1, 3)
+                    x_save = np.load("x_save_fsorted/%d_%d.npz" % (Id,i))["arr_0"]
+                    x_save = x_save.reshape(x_save.shape[0], -1, 2)
+                    c_types = np.load("c_types_fsorted/%d_%d.npz" % (Id,i))["arr_0"]
 
-                    vor.c_types = c_types
-                    vor.x_save = x_save
-                    vor.tri_save = tri_save
 
-                    vor.get_self_self_interface(100)
-                    nA, nB = vor.get_num_islands(100)
-                    n_islands = np.array([nA, nB])
-                    n_bound = vor.get_num_boundaries(100)
-                    mean_self = vor.self_self_interface.mean(axis=1)
+                vor.n_t = tri_save.shape[0]
+                vor.n_c = x_save.shape[1]
+                vor.n_v = tri_save.shape[1]
 
-                    skip = int(vor.n_t / 100)
-                    rads, L_star = get_L_star(vor.x_save, skip, 10, vor.L, vor.c_types, res=40)
+                vor.c_types = c_types
+                vor.x_save = x_save
+                vor.tri_save = tri_save
 
-                    np.savez_compressed("analysis_fsorted/%d_%d.npz" % (Id,i), n_islands=n_islands, n_bound=n_bound, L_star=L_star,
+                vor.get_self_self_interface(100)
+                nA, nB = vor.get_num_islands(100)
+                n_islands = np.array([nA, nB])
+                n_bound = vor.get_num_boundaries(100)
+                mean_self = vor.self_self_interface.mean(axis=1)
+
+                skip = int(vor.n_t / 100)
+                rads, L_star = get_L_star(vor.x_save, skip, 10, vor.L, vor.c_types, res=40)
+
+                np.savez_compressed("analysis_fsorted/%d_%d.npz" % (Id,i), n_islands=n_islands, n_bound=n_bound, L_star=L_star,
                                         mean_self=mean_self)
                 except FileNotFoundError:
                     print("False")
