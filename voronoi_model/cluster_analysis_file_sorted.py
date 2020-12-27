@@ -104,33 +104,36 @@ if __name__ == "__main__":
     def do_analysis(Id):
         for i in range(int(sys.argv[3])):
             try:
-                tri_save = np.load("tri_save_fsorted/%d_%d.npz" % (Id,i))["arr_0"]
-                tri_save = tri_save.reshape(tri_save.shape[0], -1, 3)
-                x_save = np.load("x_save_fsorted/%d_%d.npz" % (Id,i))["arr_0"]
-                x_save = x_save.reshape(x_save.shape[0], -1, 2)
-                c_types = np.load("c_types_fsorted/%d_%d.npz" % (Id,i))["arr_0"]
+                analysis = np.load("analysis_fsorted/%d_%d.npz" % (Id, i))["arr_0"]
+            except ValueError:
+                try:
+                    tri_save = np.load("tri_save_fsorted/%d_%d.npz" % (Id,i))["arr_0"]
+                    tri_save = tri_save.reshape(tri_save.shape[0], -1, 3)
+                    x_save = np.load("x_save_fsorted/%d_%d.npz" % (Id,i))["arr_0"]
+                    x_save = x_save.reshape(x_save.shape[0], -1, 2)
+                    c_types = np.load("c_types_fsorted/%d_%d.npz" % (Id,i))["arr_0"]
 
-                vor.n_t = tri_save.shape[0]
-                vor.n_c = x_save.shape[1]
-                vor.n_v = tri_save.shape[1]
+                    vor.n_t = tri_save.shape[0]
+                    vor.n_c = x_save.shape[1]
+                    vor.n_v = tri_save.shape[1]
 
-                vor.c_types = c_types
-                vor.x_save = x_save
-                vor.tri_save = tri_save
+                    vor.c_types = c_types
+                    vor.x_save = x_save
+                    vor.tri_save = tri_save
 
-                vor.get_self_self_interface(100)
-                nA, nB = vor.get_num_islands(100)
-                n_islands = np.array([nA, nB])
-                n_bound = vor.get_num_boundaries(100)
-                mean_self = vor.self_self_interface.mean(axis=1)
+                    vor.get_self_self_interface(100)
+                    nA, nB = vor.get_num_islands(100)
+                    n_islands = np.array([nA, nB])
+                    n_bound = vor.get_num_boundaries(100)
+                    mean_self = vor.self_self_interface.mean(axis=1)
 
-                skip = int(vor.n_t / 100)
-                rads, L_star = get_L_star(vor.x_save, skip, 10, vor.L, vor.c_types, res=40)
+                    skip = int(vor.n_t / 100)
+                    rads, L_star = get_L_star(vor.x_save, skip, 10, vor.L, vor.c_types, res=40)
 
-                np.savez_compressed("analysis_fsorted/%d_%d.npz" % (Id,i), n_islands=n_islands, n_bound=n_bound, L_star=L_star,
-                                    mean_self=mean_self)
-            except FileNotFoundError:
-                print("False")
+                    np.savez_compressed("analysis_fsorted/%d_%d.npz" % (Id,i), n_islands=n_islands, n_bound=n_bound, L_star=L_star,
+                                        mean_self=mean_self)
+                except FileNotFoundError:
+                    print("False")
 
 
     do_analysis(int(sys.argv[1]))
