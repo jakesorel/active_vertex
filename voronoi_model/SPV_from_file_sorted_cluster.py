@@ -3,6 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
+from pathlib import Path
+
+
 from zipfile import ZipFile
 from zipfile import BadZipfile
 def corrupt_path(path):
@@ -11,6 +14,13 @@ def corrupt_path(path):
              return False
      except BadZipfile as fail:
           return True
+
+def filesize_max(path,minn):
+    size = Path(path).stat().st_size
+    if size > minn:
+        return False
+    else:
+        return True
 
 def run_simulation(X):
     p0, v0, beta, Id,rep = X
@@ -72,7 +82,7 @@ if __name__ == "__main__":
             c_types = np.load("c_types_fsorted/%d_%d.npz" % (Id, repn))
         except FileNotFoundError:
             run_simulation((p0, v0, beta, Id, repn))
-        if corrupt_path("tri_save_fsorted/%d_%d.npz"% (Id, repn)) + corrupt_path("x_save_fsorted/%d_%d.npz"% (Id, repn)) + corrupt_path("c_types_fsorted/%d_%d.npz"% (Id, repn)) > 0:
+        if filesize_max("x_save_fsorted/%d_%d.npz"% (Id, repn),22400000):
             run_simulation((p0, v0, beta, Id, repn))
 
 
