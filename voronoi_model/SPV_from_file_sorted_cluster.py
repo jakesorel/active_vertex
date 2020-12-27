@@ -3,6 +3,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
+from zipfile import ZipFile
+from zipfile import BadZipfile
+def corrupt_path(path):
+     try:
+         with ZipFile(path) as zf:
+             return False
+     except BadZipfile as fail:
+          return True
+
 def run_simulation(X):
     p0, v0, beta, Id,rep = X
     li = rep
@@ -61,6 +70,8 @@ if __name__ == "__main__":
             tri_save = np.load("tri_save_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
             x_save = np.load("x_save_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
             c_types = np.load("c_types_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
+            if corrupt_path("tri_save_fsorted/%d_%d.npz") + corrupt_path("x_save_fsorted/%d_%d.npz") + corrupt_path("c_types_fsorted/%d_%d.npz") > 0:
+                run_simulation((p0, v0, beta, Id, repn))
         except ValueError:
             run_simulation((p0,v0,beta,Id,repn))
 
