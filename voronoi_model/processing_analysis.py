@@ -2,6 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import dask
 from dask.distributed import Client
+
+"""
+Assorted code snippets for extracting values from the analysis file for further plotting etc.
+
+Most of this code is copied elsewhere into functional scripts
+"""
+
 n_slurm_tasks = 8
 client = Client(threads_per_worker=1, n_workers=n_slurm_tasks, memory_limit="1GB")
 N = 10

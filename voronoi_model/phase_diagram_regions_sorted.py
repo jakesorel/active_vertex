@@ -11,9 +11,9 @@ from matplotlib.colors import ListedColormap
 
 
 """
-For Figure 1. 
+For Figure 2. 
 
-2D plot of n_islands across parameters. 
+2D plot of n_islands across parameters. from sorted state
 """
 
 ###1. Load the data
@@ -34,7 +34,7 @@ ID_mat = np.stack([ID_mat for i in range(rep)],axis=3)
 def get_n_islands(X):
     Id, Rep = X
     try:
-        FILE = np.load("analysis/%d_%d.npz" % (Id,Rep))
+        FILE = np.load("analysis_fsorted/%d_%d.npz" % (Id,Rep))
         return FILE["n_islands"]
     except FileNotFoundError:
         return np.ones(100)*np.nan
@@ -81,7 +81,7 @@ for iv in range(10):
     ax.set(xlabel=r"$p_0$",ylabel=r"$log_{10} \ \beta$")
     ax.set_title(r"$v_0 = %.3f$"%v0_range[iv])
     fig.subplots_adjust(top=0.8, bottom=0.25, left=0.23, right=0.8)
-    fig.savefig("analysis_plots/p0 beta v0=%.3f.pdf"%v0_range[iv],dpi=300)
+    fig.savefig("analysis_plots/fsorted p0 beta v0=%.3f.pdf"%v0_range[iv],dpi=300)
 
 
 

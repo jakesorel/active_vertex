@@ -9,6 +9,13 @@ from dask.distributed import Client
 from scipy.interpolate import bisplrep,bisplev
 from matplotlib.colors import ListedColormap
 
+"""
+For figure 1. Extracts the mean self-self interaction length (check) for different parameter regimes. 
+
+Characteristic examples across the three dimensions around a pivot point. 
+
+"""
+
 def normalise(x, xmin, xmax):
     return (x - xmin) / (xmax - xmin)
 

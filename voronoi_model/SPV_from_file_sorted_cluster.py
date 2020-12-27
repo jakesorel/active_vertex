@@ -56,7 +56,13 @@ if __name__ == "__main__":
     PP,VV,BB = np.meshgrid(p0_range, v0_range,beta_range,indexing="ij")
     p0,v0,beta = PP.take(Id),VV.take(Id),BB.take(Id)
     for repn in range(rep):
-        run_simulation((p0,v0,beta,Id,repn))
+        # run_simulation((p0, v0, beta, Id, repn))
+        try:
+            tri_save = np.load("tri_save_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
+            x_save = np.load("x_save_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
+            c_types = np.load("c_types_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
+        except ValueError:
+            run_simulation((p0,v0,beta,Id,repn))
 
 
 

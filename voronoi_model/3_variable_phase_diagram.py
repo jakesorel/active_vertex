@@ -8,6 +8,17 @@ import dask
 from dask.distributed import Client
 from scipy.interpolate import bisplrep,bisplev
 
+"""
+For figure 1. A 3 variable phase diagram for beta, v0 and p0. 
+
+The script takes the n_islands output and calculates the phase boundary (1/2 way between max and min)
+
+Then by spline interpolation, estimates the 3D shell of this boundary. 
+
+Finally plots this output
+
+"""
+
 
 ###1. Load the data
 

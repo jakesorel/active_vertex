@@ -2,6 +2,14 @@ from voronoi_model.voronoi_model_periodic import *
 import numpy as np
 import matplotlib.pyplot as plt
 
+"""
+For figure 1. 
+
+Characteristic examples of time courses of cell sorting. 
+
+One jammed, one unjammed 
+"""
+
 li = 0
 dir_name = "lattices"
 x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
