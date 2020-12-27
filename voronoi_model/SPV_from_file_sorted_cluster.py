@@ -72,7 +72,7 @@ if __name__ == "__main__":
             c_types = np.load("c_types_fsorted/%d_%d.npz" % (Id, repn))
         except FileNotFoundError:
             run_simulation((p0, v0, beta, Id, repn))
-        if corrupt_path("tri_save_fsorted/%d_%d.npz") + corrupt_path("x_save_fsorted/%d_%d.npz") + corrupt_path("c_types_fsorted/%d_%d.npz") > 0:
+        if corrupt_path("tri_save_fsorted/%d_%d.npz"% (Id, repn)) + corrupt_path("x_save_fsorted/%d_%d.npz"% (Id, repn)) + corrupt_path("c_types_fsorted/%d_%d.npz"% (Id, repn)) > 0:
             run_simulation((p0, v0, beta, Id, repn))
 
 
