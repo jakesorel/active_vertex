@@ -67,13 +67,14 @@ if __name__ == "__main__":
     for repn in range(rep):
         # run_simulation((p0, v0, beta, Id, repn))
         try:
-            tri_save = np.load("tri_save_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
-            x_save = np.load("x_save_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
-            c_types = np.load("c_types_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
-            if corrupt_path("tri_save_fsorted/%d_%d.npz") + corrupt_path("x_save_fsorted/%d_%d.npz") + corrupt_path("c_types_fsorted/%d_%d.npz") > 0:
-                run_simulation((p0, v0, beta, Id, repn))
-        except ValueError or FileNotFoundError:
-            run_simulation((p0,v0,beta,Id,repn))
+            tri_save = np.load("tri_save_fsorted/%d_%d.npz" % (Id, repn))
+            x_save = np.load("x_save_fsorted/%d_%d.npz" % (Id, repn))
+            c_types = np.load("c_types_fsorted/%d_%d.npz" % (Id, repn))
+        except FileNotFoundError:
+            run_simulation((p0, v0, beta, Id, repn))
+        if corrupt_path("tri_save_fsorted/%d_%d.npz") + corrupt_path("x_save_fsorted/%d_%d.npz") + corrupt_path("c_types_fsorted/%d_%d.npz") > 0:
+            run_simulation((p0, v0, beta, Id, repn))
+
 
 
 
