@@ -193,8 +193,8 @@ if __name__ == "__main__":
 
                 np.savez_compressed("analysis_fsorted/%d_%d.npz" % (Id,i), n_islands=n_islands, n_bound=n_bound, L_star=L_star,
                                         mean_self=mean_self)
-                except FileNotFoundError:
-                    print("False")
+            except FileNotFoundError:
+                print("False")
 
 
     do_analysis(int(sys.argv[1]))
