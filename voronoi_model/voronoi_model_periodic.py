@@ -62,7 +62,7 @@ class Tissue:
             self.x_save = []
             self.tri_save = []
 
-            self.cols = "red","blue"
+            self.cols = (1,0,0,0.5),(0,0,1,0.5)
             self.plot_scatter = True
             self.cell_movement_mask = None
             self.no_noise_time = None
@@ -459,7 +459,7 @@ class Tissue:
                         ax.scatter(x[self.c_types==i, 0], x[self.c_types==i, 1],color=cols[i],zorder=1000)
                 patches = []
                 for i, region in enumerate(regions):
-                    patches.append(Polygon(vertices[region], True,facecolor=cols[c_types_print[i]],edgecolor="white",alpha=0.5))
+                    patches.append(Polygon(vertices[region], True,facecolor=cols[c_types_print[i]],ec=(1,1,1,1)))
 
                 p = PatchCollection(patches, match_original=True)
                 # p.set_array(c_types_print)

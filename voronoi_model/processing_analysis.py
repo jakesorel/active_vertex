@@ -1,5 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import dask
+from dask.distributed import Client
+n_slurm_tasks = 8
+client = Client(threads_per_worker=1, n_workers=n_slurm_tasks, memory_limit="1GB")
 N = 10
 rep = 8
 # p0_range = np.linspace(3.5, 4, N)
@@ -13,14 +17,270 @@ PP, VV, BB,RR = np.meshgrid(p0_range, v0_range, beta_range,rep_range, indexing="
 ID_mat = np.arange(N**3).astype(int).reshape(N,N,N)
 ID_mat = np.stack([ID_mat for i in range(rep)],axis=3)
 
-# PP,VV,BB = PP[:,:,:8],VV[:,:,:8],BB[:,:,:8]
 
-def get_L_star(Id,Rep):
+def get_L_star(X):
+    Id, Rep = X
     try:
         FILE = np.load("analysis/%d_%d.npz" % (Id,Rep))
         return FILE["L_star"]
     except FileNotFoundError:
         return np.ones(100)*np.nan
+
+
+
+
+inputs = np.array([ID_mat.ravel(),RR.ravel()]).T
+inputs = inputs.astype(np.int64)
+lazy_results = []
+for inputt in inputs:
+    lazy_result = dask.delayed(get_L_star)(inputt)
+    lazy_results.append(lazy_result)
+out = dask.compute(*lazy_results)
+out = np.array(out).reshape(RR.shape[0],RR.shape[1],RR.shape[2],RR.shape[3],100)
+
+vmin,vmax = np.percentile(out,5),np.percentile(out,95)
+for i_rep in range(rep):
+    fig, ax = plt.subplots(5,2)
+    ti = -1
+    ax = ax.ravel()
+    rep_out = out[:,:,:,i_rep,ti]
+
+    for i in range(10):
+        ax[i].imshow(np.flip(rep_out[:,:,i].T,axis=1),vmin=vmin,vmax=vmax)
+        ax[i].set_title(r"$\beta = 10^{%.3f}$"%beta_range[i],fontsize=4)
+    fig.tight_layout()
+    fig.savefig("analysis_plots/beta_rep=%d.pdf"%i_rep)
+
+
+fig, ax = plt.subplots(5,2)
+ti = -1
+ax = ax.ravel()
+rep_out = out[:,:,:,:,ti].mean(axis=-1)
+vmin,vmax = np.percentile(rep_out,5),np.percentile(rep_out,100)
+
+for i in range(10):
+    ax[i].imshow(np.flip(rep_out[:,:,i].T,axis=1),vmin=vmin,vmax=vmax)
+    ax[i].set_title(r"$\beta = 10^{%.3f}$"%beta_range[i],fontsize=4)
+fig.tight_layout()
+fig.savefig("analysis_plots/beta_mean.pdf")
+
+
+
+vmin,vmax = np.percentile(out,5),np.percentile(out,95)
+for i_rep in range(rep):
+    fig, ax = plt.subplots(5,2)
+    ti = -1
+    ax = ax.ravel()
+    rep_out = out[:,:,:,i_rep,ti]
+
+    for i in range(10):
+        ax[i].imshow(np.flip(rep_out[:,i,:].T,axis=1),vmin=vmin,vmax=vmax)
+        ax[i].set_title(r"$v_0 = %.3f$"%v0_range[i],fontsize=4)
+    fig.tight_layout()
+    fig.savefig("analysis_plots/v0_rep=%d.pdf"%i_rep)
+
+
+fig, ax = plt.subplots(5,2)
+ti = -1
+ax = ax.ravel()
+rep_out = out[:,:,:,:,ti].mean(axis=-1)
+vmin,vmax = np.percentile(rep_out,5),np.percentile(rep_out,100)
+
+for i in range(10):
+    ax[i].imshow(np.flip(rep_out[:,:,i].T,axis=1),vmin=vmin,vmax=vmax)
+    ax[i].set_title(r"$\beta = 10^{%.3f}$"%beta_range[i],fontsize=4)
+fig.tight_layout()
+fig.savefig("analysis_plots/mean.pdf")
+
+
+
+
+
+"""
+NUM ISLANDS 
+
+"""
+
+
+
+def get_n_islands(X):
+    Id, Rep = X
+    try:
+        FILE = np.load("analysis/%d_%d.npz" % (Id,Rep))
+        return FILE["n_islands"]
+    except FileNotFoundError:
+        return np.ones(100)*np.nan
+
+
+
+
+inputs = np.array([ID_mat.ravel(),RR.ravel()]).T
+inputs = inputs.astype(np.int64)
+lazy_results = []
+for inputt in inputs:
+    lazy_result = dask.delayed(get_n_islands)(inputt)
+    lazy_results.append(lazy_result)
+out_nislands = dask.compute(*lazy_results)
+out_nislands = np.array(out_nislands).reshape(RR.shape[0],RR.shape[1],RR.shape[2],RR.shape[3],2,100)
+n_islands_tot = out_nislands.sum(axis=-2)
+
+vmin,vmax = np.percentile(n_islands_tot,5),np.percentile(n_islands_tot,95)
+for i_rep in range(rep):
+    fig, ax = plt.subplots(5,2)
+    ti = -1
+    ax = ax.ravel()
+    rep_out = n_islands_tot[:,:,:,i_rep,ti]
+
+    for i in range(10):
+        ax[i].imshow(np.flip(rep_out[:,:,i].T,axis=1),vmin=vmin,vmax=vmax)
+        ax[i].set_title(r"$\beta = 10^{%.3f}$"%beta_range[i],fontsize=4)
+    fig.tight_layout()
+    fig.savefig("analysis_plots/n_islands_beta_rep=%d.pdf"%i_rep)
+
+
+
+fig, ax = plt.subplots(5,2)
+ti = -1
+ax = ax.ravel()
+rep_out = n_islands_tot[:,:,:,:,ti].mean(axis=-1)
+vmin,vmax = np.percentile(rep_out,5),np.percentile(rep_out,100)
+
+for i in range(10):
+    ax[i].imshow(np.flip(rep_out[:,:,i].T,axis=1),vmin=vmin,vmax=vmax)
+    ax[i].set_title(r"$\beta = 10^{%.3f}$"%beta_range[i],fontsize=4)
+fig.tight_layout()
+fig.savefig("analysis_plots/n_islands_meanbeta.pdf")
+
+
+fig, ax = plt.subplots(5,2)
+ti = -1
+ax = ax.ravel()
+rep_out = n_islands_tot[:,:,:,:,ti].mean(axis=-1)
+vmin,vmax = np.percentile(rep_out,5),np.percentile(rep_out,100)
+
+for i in range(10):
+    ax[i].imshow(np.flip(rep_out[:,i,:].T,axis=1),vmin=vmin,vmax=vmax)
+    ax[i].set_title(r"$v_0 = %.3f$" % v0_range[i], fontsize=4)
+fig.tight_layout()
+fig.savefig("analysis_plots/n_islands_meanv0.pdf")
+
+
+
+fig, ax = plt.subplots(5,2)
+ti = -1
+ax = ax.ravel()
+rep_out = n_islands_tot[:,:,:,:,ti].mean(axis=-1)
+vmin,vmax = np.percentile(rep_out,5),np.percentile(rep_out,100)
+
+for i in range(10):
+    ax[i].imshow(np.flip(rep_out[i,:,:].T,axis=1),vmin=vmin,vmax=vmax)
+    ax[i].set_title(r"$p_0 = %.3f$" % p0_range[i], fontsize=4)
+fig.tight_layout()
+fig.savefig("analysis_plots/n_islands_meanp0.pdf")
+
+
+n_islands_tot_mean = n_islands_tot[:,:,:,:,-1].mean(axis=-1)
+from scipy.interpolate import bisplrep,bisplev
+nfine = 200
+p0_spacefine, v0_spacefine,beta_spacefine = np.linspace(p0_range.min(),p0_range.max(), nfine), np.linspace(v0_range.min(), v0_range.max(), nfine),np.logspace(np.log10(beta_range.min()),np.log10(beta_range.max()),nfine)
+# PPf,VVf,BBf = np.meshgrid(p0_spacefine,v0_spacefine,beta_spacefine,indexing="ij")
+
+PPf,VVf = np.meshgrid(p0_spacefine,v0_spacefine,indexing="ij")
+PPs,VVs = np.meshgrid(p0_range,v0_range,indexing="ij")
+
+for i in range(10):
+    z = bisplev(p0_spacefine,v0_spacefine, bisplrep(PPs.ravel(),VVs.ravel(),n_islands_tot_mean[:,:,i].ravel(),s=1))
+
+
+VVf,BBf = np.meshgrid(v0_spacefine,beta_spacefine,indexing="ij")
+VVs,lBBs = np.meshgrid(v0_range,np.log10(beta_range),indexing="ij")
+
+for i in range(10):
+    z = bisplev(v0_spacefine, np.log10(beta_spacefine),bisplrep(VVs.ravel(),lBBs,n_islands_tot_mean[i,:,:].ravel(),s=1))
+    plt.imshow(z)
+    plt.savefig("analysis_plots/z_p0=%.3f.pdf"%p0_range[i])
+    plt.close("all")
+
+from scipy.interpolate import UnivariateSpline
+
+ni_min,ni_max = np.percentile(n_islands_tot_mean,5),np.percentile(n_islands_tot_mean,95)
+ni_med = np.median(n_islands_tot_mean)
+ni_mid = (ni_max+ni_min)/2
+deviation = np.log10((n_islands_tot_mean - ni_mid)**2 + 1 - ((n_islands_tot_mean - ni_mid)**2).min())
+
+weights = (deviation.max() - deviation)/(deviation.max() - deviation.min())
+# weights = 1.0*(deviation<1)
+# weights = (n_islands_tot_mean-ni_min)**2 * (n_islands_tot_mean-ni_max)**2
+VVs,lBBs = np.meshgrid(v0_range,np.log10(beta_range),indexing="ij")
+
+
+
+PP, VV, BB = np.meshgrid(p0_range, v0_range, beta_range, indexing="ij")
+
+
+from mpl_toolkits.mplot3d import Axes3D
+fig = plt.figure()
+ax = fig.gca(projection='3d')
+for i in range(10):
+    spl = UnivariateSpline(VVs.ravel(), lBBs.ravel(),weights[i,:,:].ravel(), k=2)
+    plt.plot(v0_spacefine,spl(v0_spacefine),np.repeat(p0_range[i],v0_spacefine.size),color="k")
+    # spl2 = UnivariateSpline(VVs.ravel(), lBBs.ravel(), weights[i, :, :].ravel(), k=2)
+    # plt.plot(v0_spacefine,spl(v0_spacefine),np.repeat(p0_range[i],v0_spacefine.size),color="k")
+plt.show()
+
+fig = plt.figure()
+ax = fig.gca(projection='3d')
+thresh = 0.85
+X,Y,Z = PP[weights>thresh],VV[weights>thresh],np.log10(BB[weights>thresh])
+surf = ax.scatter(X, Y, Z)
+ax.set(xlabel="p0",ylabel="v0",zlabel="log beta")
+fig.show()
+
+
+import plotly.graph_objects as go
+import plotly.io as pio
+pio.renderers.default = "browser"
+fig = go.Figure(data=[go.Surface(z=Z,x=X,y=Y)])
+
+fig.update_layout(title='Mt Bruno Elevation', autosize=False,
+                  width=500, height=500)
+
+fig.show()
+
+
+import plotly.express as px
+df = px.data.iris()
+fig = px.scatter_3d(z=Z,x=X,y=Y)
+fig.show()
+
+
+
+import scipy as sp
+import scipy.interpolate
+spline = sp.interpolate.Rbf(X,Z,Y,smooth=1, episilon=5)
+
+PP,lBB = np.meshgrid(p0_spacefine,np.log10(beta_spacefine),indexing="ij")
+yy = spline(PP,lBB)
+fig = go.Figure(data=[go.Surface(z=zz,x=xx[0],y=yy[:,0])])
+
+fig.update_layout(title='Mt Bruno Elevation', autosize=False,
+                  width=500, height=500)
+
+fig.show()
+file_content = np.column_stack((PP.ravel(),VV.ravel(),BB.ravel(),n_islands_tot_mean.ravel()))
+np.savetxt("param_scan.txt",file_content)
+
+
+from scipy.interpolate import interp2d
+VVs,lBBs = np.meshgrid(v0_range,np.log10(beta_range),indexing="ij")
+
+interp = interp2d(VVs,lBBs,weights[:,:,4],kind="linear")
+betaa = interp(v0_spacefine,np.log10(beta_spacefine))
+plt.imshow(betaa,vmin=np.percentile(betaa,10),vmax=np.percentile(betaa,99))
+plt.show()
+
+def ellipsoid(x0,y0,z0,a,b,c):
+    return
 
 
 

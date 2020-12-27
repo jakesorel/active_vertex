@@ -2,8 +2,10 @@ from voronoi_model.voronoi_model_periodic import *
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+
 li = 0
-dir_name = "lattices"
+dir_name = "sorted_lattices"
 x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
 c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,li)).astype(np.int64)
 vor = Tissue()
@@ -14,12 +16,11 @@ vor.n_c = vor.x0.shape[0]
 vor.n_C = vor.n_c
 vor.L = 9
 
-
 p0 = 3.8333333333333335
 r = 5
-vor.v0 = 0.04722222222222222
+vor.v0 = 0.1
 vor.Dr = 1e-1
-beta = 0.007742636826811269
+beta = 0.00464159
 
 vor.kappa_A = 1
 vor.kappa_P = 1/r
@@ -28,86 +29,28 @@ vor.P0 = p0
 vor.a = 0.3
 vor.k = 1
 
-vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
+
+A_mask = vor.x[:,0]<vor.L/2
+c_types = np.zeros(vor.n_c,dtype=np.int64)
+c_types[~A_mask] = 1
+vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),pE=0.5,c_types=c_types)
 
 
-vor.set_t_span(0.025,500)
+vor.set_t_span(0.025,300)
 
 vor.simulate()
 vor.plot_scatter = False
 
 
+nt = 4
+t_range = np.linspace(0,vor.t_span.size-1,nt).astype(np.int64)
+fig, ax = plt.subplots(1,nt)
+for i, t in enumerate(t_range):
+    vor.plot_vor(vor.x_save[t],ax[i])
+    ax[i].axis("off")
+fig.show()
 
 vor.animate(n_frames=30)
-
-
-def get_null_distrib(x, pE=0.5, n_trial=1000):
-    vor = Tissue()
-    vor.generate_cells(600)
-    vor.x = x
-    vor.x0 = vor.x
-    vor.n_c = vor.x0.shape[0]
-    vor.n_C = vor.n_c
-    vor.L = 9
-    vor.set_interaction(W=np.array([[0, 1], [1, 0]]), pE=pE, randomize=True)
-
-    vor._triangulate_periodic(x)
-    c_type_mat = np.zeros((n_trial, vor.n_c),dtype=np.int64)
-    n_islands = np.zeros(n_trial)
-    for i in range(n_trial):
-
-        np.random.shuffle(vor.c_types)
-        c_type_mat[i] = vor.c_types
-        Adj = np.zeros((vor.n_c, vor.n_c), dtype=np.float32)
-        Adj[vor.tris, np.roll(vor.tris, -1, axis=1)] = 1
-        AdjA = Adj[vor.c_types == 0][:, vor.c_types == 0]
-        AdjB = Adj[vor.c_types == 1][:, vor.c_types == 1]
-        A_islands, B_islands = connected_components(csgraph=csr_matrix(AdjA), directed=False)[0], \
-                               connected_components(csgraph=csr_matrix(AdjB), directed=False)[0]
-        n_islands[i] = A_islands + B_islands
-    return n_islands
-
-n = [100,200,500,1000]
-for n_trial in n:
-    null = get_null_distrib(vor.x,n_trial=n_trial)
-    plt.plot(np.cumsum(np.bincount(null.astype(np.int64)))/n_trial)
-plt.show()
-
-from scipy.interpolate import interp1d
-
-def get_cum_distrib_smooth(x,pE,n_trial):
-    null = get_null_distrib(x,pE,n_trial=n_trial)
-    dist = np.bincount(null.astype(np.int64))
-    cumdist = np.cumsum(dist)/n_trial
-    cum_fun = interp1d(np.arange(dist.size),cumdist)
-    return cum_fun
-
-
-def get_sorting_score(cum_fun,x, pE=0.5, n_trial=1000):
-    vor = Tissue()
-    vor.generate_cells(600)
-    vor.x = x
-    vor.x0 = vor.x
-    vor.n_c = vor.x0.shape[0]
-    vor.n_C = vor.n_c
-    vor.L = 9
-    vor.set_interaction(W=np.array([[0, 1], [1, 0]]), pE=pE, randomize=True)
-
-    vor._triangulate_periodic(x)
-    Adj = np.zeros((vor.n_c, vor.n_c), dtype=np.float32)
-    Adj[vor.tris, np.roll(vor.tris, -1, axis=1)] = 1
-    AdjA = Adj[vor.c_types == 0][:, vor.c_types == 0]
-    AdjB = Adj[vor.c_types == 1][:, vor.c_types == 1]
-    A_islands, B_islands = connected_components(csgraph=csr_matrix(AdjA), directed=False)[0], \
-                           connected_components(csgraph=csr_matrix(AdjB), directed=False)[0]
-
-    return cum_fun(A_islands + B_islands)
-
-sort_val = np.zeros(20)
-for i, x in enumerate(vor.x_save[::200]):
-    cum_fun = get_cum_distrib_smooth(x,pE=0.5,n_trial=1000)
-    sort_val[i] = get_sorting_score(cum_fun, x, pE=0.5)
-
 
 
 

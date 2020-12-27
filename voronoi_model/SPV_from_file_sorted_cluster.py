@@ -1,47 +1,14 @@
-from voronoi_model.voronoi_model_periodic import *
+from voronoi_model_periodic import *
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
 
-li = 0
-dir_name = "lattices"
-x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
-c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,li)).astype(np.int64)
-vor = Tissue()
-vor.generate_cells(600)
-vor.x = x
-vor.x0 = vor.x
-vor.n_c = vor.x0.shape[0]
-vor.n_C = vor.n_c
-vor.L = 9
-
-
-p0 = 3.8333333333333335
-r = 5
-vor.v0 = 0.04722222222222222
-vor.Dr = 1e-1
-beta = 0.007742636826811269
-
-vor.kappa_A = 1
-vor.kappa_P = 1/r
-vor.A0 = 1
-vor.P0 = p0
-vor.a = 0.3
-vor.k = 1
-
-vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
-
-
-vor.set_t_span(0.025,500)
-
-vor.simulate()
-vor.plot_scatter = False
-
-
-
-vor.animate(n_frames=30)
-
-
-def get_null_distrib(x, pE=0.5, n_trial=1000):
+def run_simulation(X):
+    p0, v0, beta, Id,rep = X
+    li = rep
+    dir_name = "lattices"
+    x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
+    c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,li)).astype(np.int64)
     vor = Tissue()
     vor.generate_cells(600)
     vor.x = x
@@ -49,64 +16,50 @@ def get_null_distrib(x, pE=0.5, n_trial=1000):
     vor.n_c = vor.x0.shape[0]
     vor.n_C = vor.n_c
     vor.L = 9
-    vor.set_interaction(W=np.array([[0, 1], [1, 0]]), pE=pE, randomize=True)
-
-    vor._triangulate_periodic(x)
-    c_type_mat = np.zeros((n_trial, vor.n_c),dtype=np.int64)
-    n_islands = np.zeros(n_trial)
-    for i in range(n_trial):
-
-        np.random.shuffle(vor.c_types)
-        c_type_mat[i] = vor.c_types
-        Adj = np.zeros((vor.n_c, vor.n_c), dtype=np.float32)
-        Adj[vor.tris, np.roll(vor.tris, -1, axis=1)] = 1
-        AdjA = Adj[vor.c_types == 0][:, vor.c_types == 0]
-        AdjB = Adj[vor.c_types == 1][:, vor.c_types == 1]
-        A_islands, B_islands = connected_components(csgraph=csr_matrix(AdjA), directed=False)[0], \
-                               connected_components(csgraph=csr_matrix(AdjB), directed=False)[0]
-        n_islands[i] = A_islands + B_islands
-    return n_islands
-
-n = [100,200,500,1000]
-for n_trial in n:
-    null = get_null_distrib(vor.x,n_trial=n_trial)
-    plt.plot(np.cumsum(np.bincount(null.astype(np.int64)))/n_trial)
-plt.show()
-
-from scipy.interpolate import interp1d
-
-def get_cum_distrib_smooth(x,pE,n_trial):
-    null = get_null_distrib(x,pE,n_trial=n_trial)
-    dist = np.bincount(null.astype(np.int64))
-    cumdist = np.cumsum(dist)/n_trial
-    cum_fun = interp1d(np.arange(dist.size),cumdist)
-    return cum_fun
 
 
-def get_sorting_score(cum_fun,x, pE=0.5, n_trial=1000):
-    vor = Tissue()
-    vor.generate_cells(600)
-    vor.x = x
-    vor.x0 = vor.x
-    vor.n_c = vor.x0.shape[0]
-    vor.n_C = vor.n_c
-    vor.L = 9
-    vor.set_interaction(W=np.array([[0, 1], [1, 0]]), pE=pE, randomize=True)
+    r = 5
+    vor.v0 = v0
+    vor.Dr = 1e-1
+    beta = beta
 
-    vor._triangulate_periodic(x)
-    Adj = np.zeros((vor.n_c, vor.n_c), dtype=np.float32)
-    Adj[vor.tris, np.roll(vor.tris, -1, axis=1)] = 1
-    AdjA = Adj[vor.c_types == 0][:, vor.c_types == 0]
-    AdjB = Adj[vor.c_types == 1][:, vor.c_types == 1]
-    A_islands, B_islands = connected_components(csgraph=csr_matrix(AdjA), directed=False)[0], \
-                           connected_components(csgraph=csr_matrix(AdjB), directed=False)[0]
+    vor.kappa_A = 1
+    vor.kappa_P = 1/r
+    vor.A0 = 1
+    vor.P0 = p0
+    vor.a = 0.3
+    vor.k = 1
 
-    return cum_fun(A_islands + B_islands)
+    A_mask = vor.x[:, 0] < vor.L / 2
+    c_types = np.zeros(vor.n_c, dtype=np.int64)
+    c_types[~A_mask] = 1
+    vor.set_interaction(W=(2 * beta * vor.P0 / r) * np.array([[0, 1], [1, 0]]), pE=0.5, c_types=c_types)
 
-sort_val = np.zeros(20)
-for i, x in enumerate(vor.x_save[::200]):
-    cum_fun = get_cum_distrib_smooth(x,pE=0.5,n_trial=1000)
-    sort_val[i] = get_sorting_score(cum_fun, x, pE=0.5)
+    vor.set_t_span(0.025,500)
+
+    vor.simulate()
+
+    np.savez_compressed("tri_save_fsorted/%d_%d.npz"%(Id,rep),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
+    np.savez_compressed("x_save_fsorted/%d_%d.npz"%(Id,rep),vor.x_save.reshape(vor.n_t,2*vor.n_c))
+    np.savez_compressed("c_types_fsorted/%d_%d.npz"%(Id,rep),vor.c_types)
+
+
+
+if __name__ == "__main__":
+    Id = int(sys.argv[1])
+    N = int(sys.argv[2])
+    rep = int(sys.argv[3])
+    p0_range = np.linspace(3.5,4,N)
+    v0_range = np.linspace(5e-3,1e-1,N)
+    beta_range = np.logspace(-3,-1,N)
+
+    PP,VV,BB = np.meshgrid(p0_range, v0_range,beta_range,indexing="ij")
+    p0,v0,beta = PP.take(Id),VV.take(Id),BB.take(Id)
+    for repn in range(rep):
+        run_simulation((p0,v0,beta,Id,repn))
+
+
+
 
 
 

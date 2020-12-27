@@ -6,11 +6,12 @@ import matplotlib.pyplot as plt
 vor = Tissue()
 vor.generate_cells(600)
 vor.make_init_balanced(9,noise = 0.0005)
-p0 = 3.7
-r = 10
-vor.v0 = 0
+
+p0 = 3.8333333333333335
+r = 5
+vor.v0 = 0.06833333
 vor.Dr = 1e-1
-beta = 0.1#0.1
+beta = 0.05994843
 
 vor.kappa_A = 1
 vor.kappa_P = 1/r
@@ -19,14 +20,23 @@ vor.P0 = p0
 vor.a = 0.3
 vor.k = 1
 
-vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),pE=0,randomize=True)
+vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),pE=0.5,randomize=False)
 
 
 vor.set_t_span(0.025,100)
 
 vor.simulate()
-
 vor.plot_scatter = False
+
+
+nt = 4
+t_range = np.linspace(0,vor.t_span.size-1,nt).astype(np.int64)
+fig, ax = plt.subplots(1,nt)
+for i, t in enumerate(t_range):
+    vor.plot_vor(vor.x_save[t],ax[i])
+    ax[i].axis("off")
+fig.show()
+
 vor.animate(n_frames=30)
 
 

@@ -65,10 +65,45 @@ def true_randomize(x, pE=0.5, n_trial=1000):
     return c_type_mat[np.where(n_islands == n_islands.max())[0][0]]
 
 
+
+def find_topologically_sorted(x, pE=0.5, n_trial=1000):
+    vor = Tissue()
+    vor.generate_cells(600)
+    vor.x = x
+    vor.x0 = vor.x
+    vor.n_c = vor.x0.shape[0]
+    vor.n_C = vor.n_c
+    vor.L = 9
+    vor.set_interaction(W=np.array([[0, 1], [1, 0]]), pE=pE, randomize=True)
+
+    vor._triangulate_periodic(x)
+    c_type_mat = np.zeros((n_trial, vor.n_c),dtype=np.int64)
+    n_islands = np.zeros(n_trial)
+    for i in range(n_trial):
+        np.random.shuffle(vor.c_types)
+        c_type_mat[i] = vor.c_types
+        Adj = np.zeros((vor.n_c, vor.n_c), dtype=np.float32)
+        Adj[vor.tris, np.roll(vor.tris, -1, axis=1)] = 1
+        AdjA = Adj[vor.c_types == 0][:, vor.c_types == 0]
+        AdjB = Adj[vor.c_types == 1][:, vor.c_types == 1]
+        A_islands, B_islands = connected_components(csgraph=csr_matrix(AdjA), directed=False)[0], \
+                               connected_components(csgraph=csr_matrix(AdjB), directed=False)[0]
+        n_islands[i] = A_islands + B_islands
+    return c_type_mat[np.where(n_islands == n_islands.min())[0][0]]
+
+
 def make_random_lattice(pE=0.5, n_trial=1000):
     x = generate_lattice()
     c_types = true_randomize(x, pE, n_trial)
     return x, c_types
+
+
+
+def make_sorted_lattice(pE=0.5, n_trial=1000):
+    x = generate_lattice()
+    c_types = find_topologically_sorted(x, pE, n_trial)
+    return x, c_types
+
 
 
 if __name__ is "__main__":
@@ -76,6 +111,7 @@ if __name__ is "__main__":
     dir_name = "lattices"
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
+
 
     n_slurm_tasks = 8#int(os.environ["SLURM_NTASKS"])
     client = Client(threads_per_worker=1, n_workers=n_slurm_tasks,memory_limit="2GB")
@@ -90,6 +126,22 @@ if __name__ is "__main__":
         np.savetxt("%s/x_%d.txt"%(dir_name,i),x)
         np.savetxt("%s/c_types_%d.txt"%(dir_name,i),c_types)
 
+
+
+    sorted_dir_name = "sorted_lattices"
+    if not os.path.exists(sorted_dir_name):
+        os.makedirs(sorted_dir_name)
+
+    lazy_results = []
+    for i in range(n_rep):
+        lazy_result = dask.delayed(make_sorted_lattice)()
+        lazy_results.append(lazy_result)
+    out = dask.compute(*lazy_results)
+
+    for i, outt in enumerate(out):
+        x,c_types = outt
+        np.savetxt("%s/x_%d.txt"%(sorted_dir_name,i),x)
+        np.savetxt("%s/c_types_%d.txt"%(sorted_dir_name,i),c_types)
 
 
 
