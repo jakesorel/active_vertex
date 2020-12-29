@@ -7,7 +7,9 @@ from dask.distributed import Client
 import sys
 
 
-
+"""
+The script has been messed with a bit to deal with some corrupt files. Fix. 
+"""
 @jit(nopython=True,cache=True)
 def type_im_fast(XX,YY,res,x,L,c_types):
     d = (np.mod(np.outer(XX, np.ones_like(x[:, 0])) - np.outer(np.ones_like(XX), x[:, 0]) + L / 2, L) - L / 2) ** 2 + (np.mod(np.outer(YY, np.ones_like(x[:, 1])) - np.outer(np.ones_like(XX), x[:, 1]) + L / 2, L)- L / 2) ** 2

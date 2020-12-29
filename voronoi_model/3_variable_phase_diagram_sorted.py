@@ -38,7 +38,7 @@ ID_mat = np.stack([ID_mat for i in range(rep)],axis=3)
 def get_n_islands(X):
     Id, Rep = X
     try:
-        FILE = np.load("analysis/%d_%d.npz" % (Id,Rep))
+        FILE = np.load("analysis_fsorted/%d_%d.npz" % (Id,Rep))
         return FILE["n_islands"]
     except FileNotFoundError:
         return np.ones(100)*np.nan
@@ -123,7 +123,7 @@ camera = dict(
 ##9. Make the figure
 
 fig = go.Figure(data=[go.Surface(z=z,x=p0_spacefine,y=np.log10(beta_spacefine),
-                                 cmax=0.5,cmin=0.4999,lighting=lighting_effects,
+                                 cmax=0,cmin=-1e-6,colorscale='Reds',lighting=lighting_effects,
                                  contours={
                                      "y": {"show": True, "color": "white","size":d_beta,"start":np.log10(beta_spacefine).min(),"end":np.log10(beta_spacefine).max()},
                                     "z": {"show": True, "color": "white", "size": d_v0,"start":v0_range.min(),"end":v0_range.max()}}
@@ -136,14 +136,13 @@ fig.update_layout(autosize=True,
                   width=500, height=500,scene_camera=camera,scene=dict(xaxis_title="p₀",yaxis_title="log₁₀ β",zaxis_title="v₀",xaxis= {"nticks": 5,"range":(p0_range.min(),p0_range.max())},yaxis= {"nticks": 5,"range":(np.log10(beta_range).min(),np.log10(beta_range).max())},zaxis= {"nticks": 5,"range":(v0_range.min(),v0_range.max())}))
 
 
-
 ##8. View the figure
 
-# fig.show()
+fig.show()
 
 ##9. Save the figure
 
-fig.write_image("3 var phase_diagram.pdf",width=1000,height=1000)
-fig.write_image("3 var phase_diagram 2.pdf")
+fig.write_image("3 var phase_diagram sorted.pdf",width=1000,height=1000)
+fig.write_image("3 var phase_diagram 2 sorted.pdf")
 
 

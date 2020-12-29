@@ -92,6 +92,34 @@ def find_topologically_sorted(x, pE=0.5, n_trial=1000):
     return c_type_mat[np.where(n_islands == n_islands.min())[0][0]]
 
 
+def generate_sorted_lattice():
+    vor = Tissue()
+    vor.generate_cells(600)
+    vor.make_init_balanced(9, noise=0.0005)
+    p0 = 3.81
+    r = 10
+    vor.v0 = 5e-3
+    vor.Dr = 1e-1
+    beta = 0.1
+
+    vor.kappa_A = 1
+    vor.kappa_P = 1 / r
+    vor.A0 = 1
+    vor.P0 = p0
+    vor.a = 0.3
+    vor.k = 1
+
+    A_mask = vor.x[:, 0] < vor.L / 2
+    c_types = np.zeros(vor.n_c, dtype=np.int64)
+    c_types[~A_mask] = 1
+    vor.set_interaction(W=(2 * beta * vor.P0 / r) * np.array([[0, 1], [1, 0]]), pE=0.5, randomize=True)
+
+    vor.set_t_span(0.025, 150)
+
+    vor.simulate()
+    return vor.x
+
+
 def make_random_lattice(pE=0.5, n_trial=1000):
     x = generate_lattice()
     c_types = true_randomize(x, pE, n_trial)

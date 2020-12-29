@@ -13,7 +13,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib import cm
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
-
+from t1_functions import *
 
 class Cell:
     def __init__(self):
@@ -67,6 +67,7 @@ class Tissue:
             self.cell_movement_mask = None
             self.no_noise_time = None
             self.b_extra = 2
+            self.noise = []
 
 
             self.plot_forces = False
@@ -563,12 +564,13 @@ class Tissue:
 
 
         def generate_noise(self):
-            theta_noise = np.cumsum(np.random.normal(0, np.sqrt(2 * self.Dr * self.dt), (self.n_t, self.n_c)), axis=0) + np.random.uniform(0,np.pi*2,self.n_c)
-            self.noise = np.dstack((np.cos(theta_noise), np.sin(theta_noise)))
-            if self.cell_movement_mask is not None:
-                self.noise[:,~self.cell_movement_mask] = self.noise[:,~self.cell_movement_mask]*0
-            if self.no_noise_time is not None:
-                self.noise[:self.no_noise_time] = 0*self.noise[:self.no_noise_time]
+            if type(self.noise) is list:
+                theta_noise = np.cumsum(np.random.normal(0, np.sqrt(2 * self.Dr * self.dt), (self.n_t, self.n_c)), axis=0) + np.random.uniform(0,np.pi*2,self.n_c)
+                self.noise = np.dstack((np.cos(theta_noise), np.sin(theta_noise)))
+                if self.cell_movement_mask is not None:
+                    self.noise[:,~self.cell_movement_mask] = self.noise[:,~self.cell_movement_mask]*0
+                if self.no_noise_time is not None:
+                    self.noise[:self.no_noise_time] = 0*self.noise[:self.no_noise_time]
 
         def generate_noise_boundary(self):
             n_c_extra = int(self.n_c*self.b_extra)
@@ -1107,6 +1109,53 @@ class Tissue:
                 self.x_save[i] = x
             print("Simulation complete")
             return self.x_save
+
+
+        def simulate_haltv0(self,print_every=1000,variable_param=False):
+            """
+            Evolve the SPV.
+
+            Stores:
+                self.x_save = Cell centroids for each time-step (n_t x n_c x 2), where n_t is the number of time-steps
+                self.tri_save = Triangulation for each time-step (n_t x n_v x 3)
+
+
+            :param print_every: integer value to skip printing progress every "print_every" iterations.
+            :param variable_param: Set this to True if kappa_A,kappa_P are vectors rather than single values
+            :return: self.x_save
+            """
+            if variable_param is True:
+                F_get = self.get_F_periodic_param
+            else:
+                F_get = self.get_F_periodic
+            n_t = self.t_span.size
+            self.n_t = n_t
+            x = self.x0.copy()
+            self._triangulate_periodic(x)
+            self.x = x.copy()
+            self.x_save = np.zeros((n_t,self.n_c,2))
+            self.tri_save = np.zeros((n_t,self.tris.shape[0],3),dtype=np.int32)
+            self.generate_noise()
+            for i in range(n_t):
+                if i % print_every == 0:
+                    print(i / n_t * 100, "%")
+                self.triangulate_periodic(x)
+                self.tri_save[i] = self.tris
+                self.assign_vertices()
+                self.get_A_periodic(self.neighbours,self.vs)
+                self.get_P_periodic(self.neighbours,self.vs)
+                F = F_get(self.neighbours,self.vs)
+                F_soft = weak_repulsion(self.Cents,self.a,self.k, self.CV_matrix,self.n_c,self.L)
+                x += self.dt*(F + F_soft + self.v0*self.noise[i])
+                x = np.mod(x,self.L)
+                self.x = x
+                self.x_save[i] = x
+                if reset_v0(self.Is,self.tris):
+                    self.v0 = self.v0*0
+
+            print("Simulation complete")
+            return self.x_save
+
 
         def profile_function(self,function):
             lp = LineProfiler()

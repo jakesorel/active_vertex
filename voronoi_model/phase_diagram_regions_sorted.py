@@ -66,22 +66,23 @@ for iv in range(10):
 
     sort_mask = z<ni_mid
 
-    vmin,vmax = 2,10
-    cmap = plt.cm.inferno(normalise(np.linspace(2,10,100),z.min(),12))
+    vmin,vmax = 2,5.5
+    vmax2 = vmax*1.2
+    cmap = plt.cm.inferno(normalise(np.linspace(vmin,vmax,100),z.min(),vmax2))
     mycmap = ListedColormap(cmap)
 
     fig, ax = plt.subplots(figsize=(3.5,3))
-    ax.scatter(x[sort_mask],y[sort_mask],c=plt.cm.inferno(normalise(z[sort_mask],2,12)))
-    ax.scatter(x[~sort_mask],y[~sort_mask],c=plt.cm.inferno(normalise(z[~sort_mask],2,12)),marker=",")
+    ax.scatter(x[sort_mask],y[sort_mask],c=plt.cm.inferno(normalise(z[sort_mask],vmin,vmax2)))
+    ax.scatter(x[~sort_mask],y[~sort_mask],c=plt.cm.inferno(normalise(z[~sort_mask],vmin,vmax2)),marker=",")
     sm = plt.cm.ScalarMappable(cmap=mycmap)
     sm._A = []
-    cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.095, aspect=12, orientation="vertical",ticks=np.linspace(0,1,5))
+    cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.095, aspect=12, orientation="vertical",ticks=np.linspace(0,1,6))
     cl.set_label(r"$\langle n_{clust} \rangle$")
-    cl.ax.set_yticklabels(np.round(np.linspace(2,10,5),0))
+    cl.ax.set_yticklabels(np.round(np.linspace(vmin,vmax,6),1))
     ax.set(xlabel=r"$p_0$",ylabel=r"$log_{10} \ \beta$")
     ax.set_title(r"$v_0 = %.3f$"%v0_range[iv])
     fig.subplots_adjust(top=0.8, bottom=0.25, left=0.23, right=0.8)
     fig.savefig("analysis_plots/fsorted p0 beta v0=%.3f.pdf"%v0_range[iv],dpi=300)
 
-
+    plt.close("all")
 
