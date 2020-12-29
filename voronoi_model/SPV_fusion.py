@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 
 
-li = 99
+li = 0
 dir_name = "fusion_lattices"
 x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
 # Is = np.loadtxt("%s/Is_%d.txt"%(dir_name,li))
@@ -24,7 +24,7 @@ p0 = 4
 r = 5
 v0 = 0
 vor.Dr = 1e-1
-beta = 0.1
+beta = 0.001
 
 vor.kappa_A = 1
 vor.kappa_P = 1/r
@@ -47,7 +47,7 @@ quartets = get_quartets(vor)
 Is = quartets[1]
 thetas = get_thetas(vor,Is)
 vor.Is = Is
-vor.set_t_span(0.01,20)
+vor.set_t_span(0.01,50)
 vor.n_t = vor.t_span.size
 
 # vor.no_noise_time = int(vor.n_t/3)
@@ -58,7 +58,7 @@ vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),pE=0.5,c_ty
 
 
 vor.v0 = v0*np.ones(vor.n_c).reshape(-1,1)
-v0_chosen = 3*10**-1
+v0_chosen = 5e-2
 for i in Is:
     vor.v0[i] = v0_chosen
 
