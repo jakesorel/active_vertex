@@ -5,11 +5,11 @@ import matplotlib.pyplot as plt
 import sys
 
 
-def get_n_quartets(X):
+def get_n_quartets(X,lId):
     p0,v0_chosen,beta,Id = X
     dir_name = "fusion_lattices"
-    x = np.loadtxt("%s/x_%d.txt"%(dir_name,Id))
-    c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,Id)).astype(np.int64)
+    x = np.loadtxt("%s/x_%d.txt"%(dir_name,lId))
+    c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,lId)).astype(np.int64)
     vor = Tissue()
     vor.generate_cells(600)
     vor.x = x
@@ -35,10 +35,10 @@ def get_lattice_id(p0,beta):
     return np.where((np.abs(PP.ravel()-p0)<1e-16)*(np.abs(BB.ravel()-beta)<1e-16))[0][0]
 
 def simulate(X):
-    n_quartets = get_n_quartets(X)
+    p0, v0_chosen, beta, Id = X
+    lId = get_lattice_id(p0, beta)
+    n_quartets = get_n_quartets(X,lId)
     for rep in range(n_quartets):
-        p0,v0_chosen,beta,Id = X
-        lId = get_lattice_id(p0,beta)
         dir_name = "fusion_lattices"
         x = np.loadtxt("%s/x_%d.txt"%(dir_name,lId))
         c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,lId)).astype(np.int64)
