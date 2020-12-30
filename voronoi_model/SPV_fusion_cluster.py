@@ -149,7 +149,7 @@ def simulate(X):
         n_islands = np.array(vor.get_num_islands(2)).sum(axis=0)[-1]
         swapped = np.sum(vor.v0)==0
 
-        np.savez_compressed("fusion_using_optv0/%d_%d.npz"%(Id,rep),n_islands=n_islands,energies=energies_all,swapped=swapped)
+        np.savez_compressed("fusion_using_optv0_2/%d_%d.npz"%(Id,rep),n_islands=n_islands,energies_all=energies_all,swapped=swapped)
         print("done")
 
 if __name__ == "__main__":

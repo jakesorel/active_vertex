@@ -1,7 +1,7 @@
 import numpy as np
 import dask
 from dask.distributed import Client
-
+import matplotlib.pyplot as plt
 
 n_slurm_tasks = 8
 client = Client(threads_per_worker=1, n_workers=n_slurm_tasks, memory_limit="1GB")
@@ -11,20 +11,20 @@ p0_range = np.linspace(3.5, 4, N)
 v0_range = np.linspace(1e-2, 1, N)
 beta_range = np.logspace(-3, -1, N)
 
-repn = 20
-n_t = 2000
+repn = 8
+n_t = 20000
 
 
 rep_range = np.arange(repn)
-PP, VV, BB,RR = np.meshgrid(p0_range, v0_range, beta_range,rep_range, indexing="ij")
-ID_mat = np.arange(N**3).astype(int).reshape(N,N,N)
-ID_mat = np.stack([ID_mat for i in range(repn)],axis=3)
+PP, BB,RR = np.meshgrid(p0_range, beta_range,rep_range, indexing="ij")
+ID_mat = np.arange(N**2).astype(int).reshape(N,N)
+ID_mat = np.stack([ID_mat for i in range(repn)],axis=2)
 
-
+dir_name = "fusion_using_optv0"
 
 def extract_energies(Id,rep):
     try:
-        return np.load("fusion/%d_%d.npz"%(Id,rep))["energies"]
+        return np.load("%s/%d_%d.npz"%(dir_name,Id,rep))["energies"]
     except:
         return np.ones(n_t)*np.nan
 
@@ -32,7 +32,13 @@ def extract_energies(Id,rep):
 
 def extract_n_islands(Id,rep):
     try:
-        return np.load("fusion/%d_%d.npz"%(Id,rep))["n_islands"]
+        return np.load("%s/%d_%d.npz"%(dir_name,Id,rep))["n_islands"]
+    except:
+        return np.nan
+
+def extract_swapped(Id, rep):
+    try:
+        return np.load("%s/%d_%d.npz"%(dir_name,Id,rep))["swapped"]
     except:
         return np.nan
 
@@ -45,7 +51,8 @@ for inputt in inputs:
     lazy_result = dask.delayed(extract_energies)(*inputt)
     lazy_results.append(lazy_result)
 out = dask.compute(*lazy_results)
-out = np.array(out).reshape(RR.shape[0],RR.shape[1],RR.shape[2],RR.shape[3],n_t)
+out = np.array(out).reshape(RR.shape[0],RR.shape[1],RR.shape[2],-1)
+
 
 inputs = np.array([ID_mat.ravel(),RR.ravel()]).T
 inputs = inputs.astype(np.int64)
@@ -54,40 +61,47 @@ for inputt in inputs:
     lazy_result = dask.delayed(extract_n_islands)(*inputt)
     lazy_results.append(lazy_result)
 out_nislands = dask.compute(*lazy_results)
-out_nislands = np.array(out_nislands).reshape(RR.shape[0],RR.shape[1],RR.shape[2],RR.shape[3])
+out_nislands = np.array(out_nislands).reshape(RR.shape[0],RR.shape[1],RR.shape[2])
+
+
+
+inputs = np.array([ID_mat.ravel(),RR.ravel()]).T
+inputs = inputs.astype(np.int64)
+lazy_results = []
+for inputt in inputs:
+    lazy_result = dask.delayed(extract_swapped)(*inputt)
+    lazy_results.append(lazy_result)
+out_swapped = dask.compute(*lazy_results)
+out_swapped = np.array(out_swapped).reshape(RR.shape[0],RR.shape[1],RR.shape[2])
+
+
+out[~out_swapped] = np.nan
+
+E_0,E_t,E_act = out[:,:,:,0],out[:,:,:,-1],np.nanmax(out,axis=-1)
+dE = E_t - E_0
+
+fig, ax = plt.subplots(1,2)
+ax[0].imshow(np.log(np.flip(np.nanmean(E_act,axis=-1).T,axis=0)))
+ax[1].imshow(np.flip(np.nanmean(dE,axis=-1).T,axis=0))
+fig.show()
+
+
+print(out_swapped.mean()*100,"% swapped (ensure this is 100%)")
+
+
+
+
+#############################
 
 
 
 fig, ax = plt.subplots()
 cols = plt.cm.plasma(np.linspace(0,1,N))
-for i in range(N):
-    ax.plot(out[-1,i,2,6,:],color=cols[i])
+for i in range(8):
+    ax.plot(out[0,2,i],color=cols[i])
 # ax.set(xscale="log")
 fig.show()
 
-
-minv0 = np.zeros((N,N,repn))
-for k in range(repn):
-    for i in range(N):
-        for j in range(N):
-            mask = out_nislands[i,:,j,k]==2
-            if mask.sum()!= 0:
-                minv0[i,j,k] = v0_range[np.nonzero(mask)[0][0]]
-            else:
-                minv0[i,j,k] = np.nan
-
-meanminv0 = np.nanmean(minv0,axis=-1)
-
-plt.imshow(meanminv0)
-plt.show()
-
-PPs, lBBs = np.meshgrid(p0_range, np.log10(beta_range), indexing="ij")
-levels = np.linspace(np.nanmin(meanminv0),np.nanmax(meanminv0),100)
-plt.tricontourf(PPs.ravel()[~np.isnan(meanminv0.ravel())],lBBs.ravel()[~np.isnan(meanminv0.ravel())],meanminv0.ravel()[~np.isnan(meanminv0.ravel())],levels=levels)
-plt.show()
-from scipy.signal import find_peaks
-
-find_peaks(energy)
 
 max_energy_cutoff = np.nanpercentile(np.nanmax(out,axis=-1).ravel(),99) #remove instability e.g. s
 
