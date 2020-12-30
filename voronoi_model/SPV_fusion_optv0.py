@@ -40,6 +40,7 @@ def simulate(X):
     p0, beta, Id = X
     lId = get_lattice_id(p0, beta)
     n_quartets = get_n_quartets(lId)
+    n_quartets = np.min((n_quartets,8))
     def evaluate(v0_chosen,rep):
         dir_name = "fusion_lattices"
         x = np.loadtxt("%s/x_%d.txt"%(dir_name,lId))
@@ -74,9 +75,9 @@ def simulate(X):
         Is = quartets[rep]
         thetas = get_thetas(vor, Is)
         vor.Is = Is
-        vor.set_t_span(0.025,20)
+        vor.set_t_span(0.025,30)
         vor.n_t = vor.t_span.size
-        vor.no_noise_time = int(vor.t_span.size/4)
+        vor.no_noise_time = 400
 
         generate_noise_fixed(vor,Is,thetas)
         c_types[Is[0]] = 0
