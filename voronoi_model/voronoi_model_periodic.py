@@ -1150,8 +1150,15 @@ class Tissue:
                 x = np.mod(x,self.L)
                 self.x = x
                 self.x_save[i] = x
-                if reset_v0(self.Is,self.tris):
-                    self.v0 = self.v0*0
+                ###Before was:
+                #if reset_v0(self.Is, self.tris):
+                #   self.v0 *=0
+
+                if np.mod(i,self.haltwait)==0:
+                    if reset_v0(self.Is,self.tris):
+                        self.v0 = self.v0_orig*0
+                    else:
+                        self.v0 = self.v0_orig.copy()
 
             print("Simulation complete")
             return self.x_save

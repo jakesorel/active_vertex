@@ -96,7 +96,7 @@ def generate_noise_fixed(self,Is,thetas):
 
 
 def interpolate_x(self,x_save,t1_time,t_eval_i,t_eval):
-    x_save_sample = x_save[t1_time+t_eval_i]
+    x_save_sample = x_save[t1_time+t_eval_i].copy()
     dx_save_sample = np.mod(x_save_sample - x_save_sample[0]+self.L/2,self.L)-self.L/2
     x_save_fine = np.zeros((t_eval.size,x_save.shape[1],2))
     for j, x in enumerate(dx_save_sample.transpose(1,0,2)):
@@ -107,7 +107,7 @@ def interpolate_x(self,x_save,t1_time,t_eval_i,t_eval):
 
 def get_energy(self,x,kappa_A,kappa_P,J,get_l_interface,):
     self.x = x
-    self.triangulate_periodic(x)
+    self._triangulate_periodic(x)
     self.assign_vertices()
     A = self.get_A_periodic(self.neighbours,self.vs)
     P = self.get_P_periodic(self.neighbours,self.vs)
