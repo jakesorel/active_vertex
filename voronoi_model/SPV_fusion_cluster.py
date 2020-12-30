@@ -1,5 +1,5 @@
-from voronoi_model.voronoi_model_periodic import *
-from voronoi_model.t1_functions import *
+from voronoi_model_periodic import *
+from t1_functions import *
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
