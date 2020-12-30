@@ -35,29 +35,33 @@ def get_lattice_id(p0,beta):
     beta_range = np.logspace(-3,-1,N)
     PP,BB = np.meshgrid(p0_range,beta_range,indexing="ij")
     return np.where((np.abs(PP.ravel()-p0)<1e-16)*(np.abs(BB.ravel()-beta)<1e-16))[0][0]
-
-def plot_tcourse(vor):
-    nt = 3
-    t_range = np.linspace(0, vor.t_span.size - 1, nt).astype(np.int64)
-    fig, ax = plt.subplots(1, nt)
-    for i, t in enumerate(t_range):
-        vor.plot_vor(vor.x_save[t], ax[i])
-        ax[i].quiver(vor.x_save[t, vor.Is, 0], vor.x_save[t, vor.Is, 1], vor.noise[t, vor.Is, 0], vor.noise[t, vor.Is, 1])
-        ax[i].axis("off")
-
-    fig.show()
+#
+# def plot_tcourse(vor):
+#     nt = 3
+#     t_range = np.linspace(0, vor.t_span.size - 1, nt).astype(np.int64)
+#     fig, ax = plt.subplots(1, nt)
+#     for i, t in enumerate(t_range):
+#         vor.plot_vor(vor.x_save[t], ax[i])
+#         ax[i].quiver(vor.x_save[t, vor.Is, 0], vor.x_save[t, vor.Is, 1], vor.noise[t, vor.Is, 0], vor.noise[t, vor.Is, 1])
+#         ax[i].axis("off")
+#
+#     fig.show()
 
 def simulate(X):
-    p0, v0_chosen, beta, Id = X
-    p0,v0_chosen,beta = 4,0.3,1e-3
-    sys.argv[2] = 10
-    rep = 0
+    p0, beta, Id = X
+
+    # p0,beta = 4,1e-3
+    # sys.argv[2] = 10
+    # rep = 0
+
     lId = get_lattice_id(p0, beta)
-    # n_quartets = get_n_quartets(lId)
+    n_quartets = get_n_quartets(lId)
+    n_quartets = np.min((8,n_quartets))
     for rep in range(n_quartets):
         dir_name = "fusion_lattices"
         x = np.loadtxt("%s/x_%d.txt"%(dir_name,lId))
         c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,lId)).astype(np.int64)
+        v0_chosen = np.loadtxt("optv0s/%d.txt"%lId)[rep]
         vor = Tissue()
         vor.generate_cells(600)
         vor.x = x
@@ -105,7 +109,7 @@ def simulate(X):
         vor.haltwait = 1
         vor.simulate_haltv0()
 
-        plot_tcourse(vor)
+        # plot_tcourse(vor)
 
         J = np.zeros_like(vor.J)
         kappa_A = np.zeros(vor.n_c)
@@ -131,29 +135,29 @@ def simulate(X):
         for j, x in enumerate(x_save_sample2):
             energies2[j] = get_energy(vor, x, kappa_A, kappa_P, J, get_l_interface)
 
-        T_eval_all = np.concatenate((T_eval,T_eval2))
+        # T_eval_all = np.concatenate((T_eval,T_eval2))
         energies_all = np.concatenate((energies,energies2))
 
-        plt.close("all")
-        fig, ax = plt.subplots()
-        ax.plot(T_eval_all,energies_all)
-        fig.show()
+
+        # plt.close("all")
+        # fig, ax = plt.subplots()
+        # ax.plot(T_eval_all,energies_all)
+        # fig.show()
 
 
 
         n_islands = np.array(vor.get_num_islands(2)).sum(axis=0)[-1]
         swapped = np.sum(vor.v0)==0
 
-        np.savez_compressed("fusion/%d_%d.npz"%(Id,rep),n_islands=n_islands,energies=energies,swapped=swapped)
-
+        np.savez_compressed("fusion_using_optv0/%d_%d.npz"%(Id,rep),n_islands=n_islands,energies=energies_all,swapped=swapped)
+        print("done")
 
 if __name__ == "__main__":
     Id = int(sys.argv[1])
     N = int(sys.argv[2])
     p0_range = np.linspace(3.5,4,N)
-    v0_range = np.linspace(1e-2,1,N)
     beta_range = np.logspace(-3,-1,N)
 
-    PP,VV,BB = np.meshgrid(p0_range, v0_range,beta_range,indexing="ij")
-    p0,v0,beta = PP.take(Id),VV.take(Id),BB.take(Id)
-    simulate((p0,v0,beta,Id))
+    PP,BB = np.meshgrid(p0_range,beta_range,indexing="ij")
+    p0,beta = PP.take(Id),BB.take(Id)
+    simulate((p0,beta,Id))
