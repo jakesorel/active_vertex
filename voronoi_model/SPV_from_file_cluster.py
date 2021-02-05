@@ -37,9 +37,9 @@ def run_simulation(X):
 
     vor.simulate()
 
-    np.savez_compressed("tri_save/%d_%d.npz"%(Id,rep),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
-    np.savez_compressed("x_save/%d_%d.npz"%(Id,rep),vor.x_save.reshape(vor.n_t,2*vor.n_c))
-    np.savez_compressed("c_types/%d_%d.npz"%(Id,rep),vor.c_types)
+    np.savez_compressed("from_unsorted/tri_save/%d_%d.npz"%(Id,rep),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
+    np.savez_compressed("from_unsorted/x_save/%d_%d.npz"%(Id,rep),vor.x_save.reshape(vor.n_t,2*vor.n_c))
+    np.savez_compressed("from_unsorted/c_types/%d_%d.npz"%(Id,rep),vor.c_types)
 
 
 
