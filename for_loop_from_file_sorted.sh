@@ -1,6 +1,9 @@
 #!/bin/bash
 
-((N = "$1"*"$1"*"$1"))
+((N = "$1"*"$1"))
+
+mkdir from_sorted
+mkdir from_sorted/x_save from_sorted/tri_save from_sorted/c_types
 
 
 for i in $(seq 0 $(($N-1)))
