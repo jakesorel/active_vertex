@@ -2,8 +2,8 @@ import numpy as np
 from voronoi_model.voronoi_model_periodic import *
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
-import dask
-from dask.distributed import Client
+# import dask
+# from dask.distributed import Client
 
 
 """
@@ -95,7 +95,7 @@ def find_topologically_sorted(x, pE=0.5, n_trial=1000):
 def generate_sorted_lattice():
     vor = Tissue()
     vor.generate_cells(600)
-    vor.make_init_balanced(9, noise=0.0005)
+    vor.make_init_balanced(15, noise=0.0005)
     p0 = 3.81
     r = 10
     vor.v0 = 5e-3
@@ -134,44 +134,46 @@ def make_sorted_lattice(pE=0.5, n_trial=1000):
 
 
 
-if __name__ is "__main__":
+if __name__ == "__main__":
     n_rep = 25
     dir_name = "lattices"
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
 
 
-    n_slurm_tasks = 8#int(os.environ["SLURM_NTASKS"])
-    client = Client(threads_per_worker=1, n_workers=n_slurm_tasks,memory_limit="2GB")
-    lazy_results = []
+    # n_slurm_tasks = 8#int(os.environ["SLURM_NTASKS"])
+    # client = Client(threads_per_worker=1, n_workers=n_slurm_tasks,memory_limit="2GB")
+    # lazy_results = []
+    out = []
     for i in range(n_rep):
-        lazy_result = dask.delayed(make_random_lattice)()
-        lazy_results.append(lazy_result)
-    out = dask.compute(*lazy_results)
+        # lazy_result = dask.delayed(make_random_lattice)()
+        # lazy_results.append(lazy_result)
+        out.append(make_random_lattice())
+    # out = dask.compute(*lazy_results)
 
     for i, outt in enumerate(out):
         x,c_types = outt
         np.savetxt("%s/x_%d.txt"%(dir_name,i),x)
         np.savetxt("%s/c_types_%d.txt"%(dir_name,i),c_types)
-
-
-
-    sorted_dir_name = "sorted_lattices"
-    if not os.path.exists(sorted_dir_name):
-        os.makedirs(sorted_dir_name)
-
-    lazy_results = []
-    for i in range(n_rep):
-        lazy_result = dask.delayed(make_sorted_lattice)()
-        lazy_results.append(lazy_result)
-    out = dask.compute(*lazy_results)
-
-    for i, outt in enumerate(out):
-        x,c_types = outt
-        np.savetxt("%s/x_%d.txt"%(sorted_dir_name,i),x)
-        np.savetxt("%s/c_types_%d.txt"%(sorted_dir_name,i),c_types)
-
-
+    #
+    #
+    #
+    # sorted_dir_name = "sorted_lattices"
+    # if not os.path.exists(sorted_dir_name):
+    #     os.makedirs(sorted_dir_name)
+    #
+    # lazy_results = []
+    # for i in range(n_rep):
+    #     lazy_result = dask.delayed(make_sorted_lattice)()
+    #     lazy_results.append(lazy_result)
+    # out = dask.compute(*lazy_results)
+    #
+    # for i, outt in enumerate(out):
+    #     x,c_types = outt
+    #     np.savetxt("%s/x_%d.txt"%(sorted_dir_name,i),x)
+    #     np.savetxt("%s/c_types_%d.txt"%(sorted_dir_name,i),c_types)
+    #
+    #
 
 
 

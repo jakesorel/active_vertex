@@ -2030,7 +2030,7 @@ def get_F_periodic(vs, neighbours,tris,CV_matrix,n_v,n_c,L,J_CW,J_CCW,A,P,X,kapp
     h_jp1 = np.dstack((roll_reverse(neighbours[:,:,0]),roll_reverse(neighbours[:,:,1])))
 
 
-    dAdh_j = np.mod(h_jp1 - h_jm1 + L / 2, L) - L / 2
+    dAdh_j = 0.5*(np.mod(h_jp1 - h_jm1 + L / 2, L) - L / 2)
     dAdh_j = np.dstack((dAdh_j[:,:,1],-dAdh_j[:,:,0]))
 
     l_jm1 = np.mod(h_j - h_jm1 + L / 2, L) - L / 2
