@@ -15,23 +15,24 @@ vor.n_C = vor.n_c
 vor.L = 9
 
 
-p0 = 3.8333333333333335
+p0 = 3.9
 r = 10
-vor.v0 = 0.01
+vor.v0 = 0.025
 vor.Dr = 1e-1
-beta = 0.007742636826811269
+beta = 0.01
 
 vor.kappa_A = 1
 vor.kappa_P = 1/r
 vor.A0 = 1
 vor.P0 = p0
 vor.a = 0.3
-vor.k = 1
+vor.k = 0
 
-vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
+vor.set_interaction(W = beta*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
 
 
-vor.set_t_span(0.025,500)
+vor.set_t_span(0.025,2000)
+print(vor.t_span.size)
 
 vor.simulate()
 vor.plot_scatter = False
