@@ -2,6 +2,8 @@
 
 ((N = "$1"*"$1"))
 
+mkdir from_unsorted
+mkdir from_unsorted/x_save from_unsorted/tri_save from_unsorted/c_types
 
 for i in $(seq 0 $(($N-1)))
 do
