@@ -3,27 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
-from pathlib import Path
-
-
-from zipfile import ZipFile
-from zipfile import BadZipfile
-def corrupt_path(path):
-     try:
-         with ZipFile(path) as zf:
-             return False
-     except BadZipfile as fail:
-          return True
-
-def filesize_max(path,minn):
-    size = Path(path).stat().st_size
-    if size > minn:
-        return False
-    else:
-        return True
-
 def run_simulation(X):
-    p0, v0, beta, Id,rep = X
+    v0, beta, Id,rep = X
     li = rep
     dir_name = "lattices"
     x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
@@ -37,7 +18,7 @@ def run_simulation(X):
     vor.L = 9
 
 
-    r = 5
+    r = 10
     vor.v0 = v0
     vor.Dr = 1e-1
     beta = beta
@@ -45,22 +26,22 @@ def run_simulation(X):
     vor.kappa_A = 1
     vor.kappa_P = 1/r
     vor.A0 = 1
-    vor.P0 = p0
+    vor.P0 = 3.9
     vor.a = 0.3
-    vor.k = 1
+    vor.k = 0
 
     A_mask = vor.x[:, 0] < vor.L / 2
     c_types = np.zeros(vor.n_c, dtype=np.int64)
     c_types[~A_mask] = 1
-    vor.set_interaction(W=(2 * beta * vor.P0 / r) * np.array([[0, 1], [1, 0]]), pE=0.5, c_types=c_types)
+    vor.set_interaction(W=beta * np.array([[0, 1], [1, 0]]), pE=0.5, c_types=c_types)
 
-    vor.set_t_span(0.025,500)
+    vor.set_t_span(0.05,2000)
 
     vor.simulate()
 
-    np.savez_compressed("tri_save_fsorted/%d_%d.npz"%(Id,rep),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
-    np.savez_compressed("x_save_fsorted/%d_%d.npz"%(Id,rep),vor.x_save.reshape(vor.n_t,2*vor.n_c))
-    np.savez_compressed("c_types_fsorted/%d_%d.npz"%(Id,rep),vor.c_types)
+    np.savez_compressed("from_sorted/tri_save/%d_%d.npz"%(Id,rep),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
+    np.savez_compressed("from_sorted/x_save/%d_%d.npz"%(Id,rep),vor.x_save.reshape(vor.n_t,2*vor.n_c))
+    np.savez_compressed("from_sorted/c_types/%d_%d.npz"%(Id,rep),vor.c_types)
 
 
 
@@ -68,24 +49,13 @@ if __name__ == "__main__":
     Id = int(sys.argv[1])
     N = int(sys.argv[2])
     rep = int(sys.argv[3])
-    p0_range = np.linspace(3.5,4,N)
     v0_range = np.linspace(5e-3,1e-1,N)
     beta_range = np.logspace(-3,-1,N)
 
-    PP,VV,BB = np.meshgrid(p0_range, v0_range,beta_range,indexing="ij")
-    p0,v0,beta = PP.take(Id),VV.take(Id),BB.take(Id)
+    VV,BB = np.meshgrid(v0_range,beta_range,indexing="ij")
+    v0,beta = VV.take(Id),BB.take(Id)
     for repn in range(rep):
-        # run_simulation((p0, v0, beta, Id, repn))
-        try:
-            tri_save = np.load("tri_save_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
-            x_save = np.load("x_save_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
-            c_types = np.load("c_types_fsorted/%d_%d.npz" % (Id, repn))["arr_0"]
-        except ValueError or FileNotFoundError:
-            for repnn in range(repn,rep):
-                run_simulation((p0, v0, beta, Id, repnn))
-        # if filesize_max("x_save_fsorted/%d_%d.npz"% (Id, repn),22400000):
-        #     for repnn in range(repn,rep):
-        #         run_simulation((p0, v0, beta, Id, repnn))
+        run_simulation((v0, beta, Id, repn))
 
 
 
