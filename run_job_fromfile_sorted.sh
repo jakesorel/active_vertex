@@ -5,8 +5,8 @@
 #SBATCH --time=2:00:00   # walltime
 #SBATCH --ntasks=1   # number of processor cores (i.e. tasks)
 #SBATCH -J "active_vertex"   # job name
-#SBATCH --output=output.out
-#SBATCH --error=output.out
+#SBATCH --output=output_fromsorted.out
+#SBATCH --error=output_fromsorted.out
 
 
 source activate apical_domain
