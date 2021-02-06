@@ -1,7 +1,8 @@
 #!/bin/bash
 
-((N = "$1"*"$1"*"$1"))
+((N = "$1"*"$1"))
 
+mkdir from_sorted/analysis
 
 for i in $(seq 0 $(($N-1)))
 do
