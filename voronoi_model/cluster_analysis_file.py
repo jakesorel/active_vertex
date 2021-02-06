@@ -83,7 +83,7 @@ if __name__ == "__main__":
     vor = Tissue()
     vor.generate_cells(600)
     vor.make_init_balanced(9, noise=0.0005)
-    p0 = 3.81
+    p0 = 3.9
     r = 10
     vor.v0 = 5e-3
     vor.Dr = 1e-1
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     vor.kappa_A = 1
     vor.kappa_P = 1 / r
     vor.A0 = 1
-    vor.P0 = 3.9
+    vor.P0 = p0
     vor.a = 0.3
     vor.k = 0
 

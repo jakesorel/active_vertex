@@ -11,4 +11,4 @@
 
 source activate apical_domain
 
-python voronoi_model/SPV_from_file_sorted_cluster.py "$1" "$2" "$3"
+python voronoi_model/SPV_from_file_sorted_cluster.py "$1" "$2" "$3" "$4"

@@ -5,43 +5,43 @@ import sys
 from os import path
 
 def run_simulation(X):
-    v0, beta, Id,rep = X
-    if not path.exists("from_unsorted/tri_save/%d_%d.npz"%(Id,rep)):
-        li = rep
-        dir_name = "lattices"
-        x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
-        c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,li)).astype(np.int64)
-        vor = Tissue()
-        vor.generate_cells(600)
-        vor.x = x
-        vor.x0 = vor.x
-        vor.n_c = vor.x0.shape[0]
-        vor.n_C = vor.n_c
-        vor.L = 9
+    v0, beta, Id,rep,run = X
+    # if not path.exists("from_unsorted/tri_save/%d_%d.npz"%(Id,rep)):
+    li = rep + run*int(sys.argv[3])
+    dir_name = "lattices"
+    x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
+    c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,li)).astype(np.int64)
+    vor = Tissue()
+    vor.generate_cells(600)
+    vor.x = x
+    vor.x0 = vor.x
+    vor.n_c = vor.x0.shape[0]
+    vor.n_C = vor.n_c
+    vor.L = 9
 
 
-        r = 10
-        vor.v0 = v0
-        vor.Dr = 1e-1
-        beta = beta
+    r = 10
+    vor.v0 = v0
+    vor.Dr = 1e-1
+    beta = beta
 
-        vor.kappa_A = 1
-        vor.kappa_P = 1/r
-        vor.A0 = 1
-        vor.P0 = 3.9
-        vor.a = 0.3
-        vor.k = 0
+    vor.kappa_A = 1
+    vor.kappa_P = 1/r
+    vor.A0 = 1
+    vor.P0 = 3.9
+    vor.a = 0.3
+    vor.k = 0
 
-        vor.set_interaction(W = beta*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
+    vor.set_interaction(W = beta*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
 
 
-        vor.set_t_span(0.05,2000)
+    vor.set_t_span(0.025,500)
 
-        vor.simulate()
+    vor.simulate()
 
-        np.savez_compressed("from_unsorted/tri_save/%d_%d.npz"%(Id,rep),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
-        np.savez_compressed("from_unsorted/x_save/%d_%d.npz"%(Id,rep),vor.x_save.reshape(vor.n_t,2*vor.n_c))
-        np.savez_compressed("from_unsorted/c_types/%d_%d.npz"%(Id,rep),vor.c_types)
+    np.savez_compressed("from_unsorted/tri_save/%d_%d_%d.npz"%(Id,rep,run),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
+    np.savez_compressed("from_unsorted/x_save/%d_%d_%d.npz"%(Id,rep,run),vor.x_save.reshape(vor.n_t,2*vor.n_c))
+    np.savez_compressed("from_unsorted/c_types/%d_%d_%d.npz"%(Id,rep,run),vor.c_types)
 
 
 
@@ -49,13 +49,14 @@ if __name__ == "__main__":
     Id = int(sys.argv[1])
     N = int(sys.argv[2])
     rep = int(sys.argv[3])
+    run = int(sys.argv[4])
     v0_range = np.linspace(5e-3,1e-1,N)
     beta_range = np.logspace(-3,-1,N)
 
     VV,BB = np.meshgrid(v0_range,beta_range,indexing="ij")
     v0,beta = VV.take(Id),BB.take(Id)
     for repn in range(rep):
-        run_simulation((v0,beta,Id,repn))
+        run_simulation((v0,beta,Id,repn,run))
 
 
 
