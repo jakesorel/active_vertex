@@ -5,8 +5,8 @@
 #SBATCH --time=0:30:00   # walltime
 #SBATCH --ntasks=1   # number of processor cores (i.e. tasks)
 #SBATCH -J "AV_jakecs"   # job name
-#SBATCH --output=output.out
-#SBATCH --error=output.out
+#SBATCH --output=output_analysis_unsorted.out
+#SBATCH --error=output_analysis_unsorted.out
 
 source activate self-organisation-mouse
 
