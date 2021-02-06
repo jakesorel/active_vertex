@@ -2,10 +2,12 @@ from voronoi_model_periodic import *
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
+from os import path
+
 
 def run_simulation(X):
     v0, beta, Id,rep = X
-    if not os.exists("from_sorted/tri_save/%d_%d.npz"%(Id,rep)):
+    if not path.exists("from_sorted/tri_save/%d_%d.npz"%(Id,rep)):
         li = rep
         dir_name = "lattices"
         x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
