@@ -12,17 +12,18 @@ Most of this code is copied elsewhere into functional scripts
 n_slurm_tasks = 8
 client = Client(threads_per_worker=1, n_workers=n_slurm_tasks, memory_limit="1GB")
 N = 10
-rep = 8
+rep = 6
+runs = 2
 # p0_range = np.linspace(3.5, 4, N)
 # v0_range = np.linspace(5e-3, 1e-1, N)
 # beta_range = np.linspace(0, 0.3)
-p0_range = np.linspace(3.5, 4, N)
 v0_range = np.linspace(5e-3, 1e-1, N)
 beta_range = np.logspace(-3, -1, N)
 rep_range = np.arange(rep)
-PP, VV, BB,RR = np.meshgrid(p0_range, v0_range, beta_range,rep_range, indexing="ij")
-ID_mat = np.arange(N**3).astype(int).reshape(N,N,N)
-ID_mat = np.stack([ID_mat for i in range(rep)],axis=3)
+run_range = np.arange(runs)
+VV, BB,RR = np.meshgrid(v0_range, beta_range,rep_range,run_range, indexing="ij")
+ID_mat = np.arange(N**2).astype(int).reshape(N,N)
+ID_mat = np.stack([np.stack([ID_mat for i in range(rep)],axis=2) for i in range(runs)])
 
 
 def get_L_star(X):
