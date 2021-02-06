@@ -1068,7 +1068,7 @@ class Tissue:
             F = get_F(vs, neighbours, self.tris, self.CV_matrix, self.n_v, self.n_c, self.L, J_CW, J_CCW, self.A, self.P, self.Cents, self.kappa_A, self.kappa_P, self.A0, self.P0,self.n_C,self.kappa_B,self.l_b0)
             return F
 
-        def simulate(self,print_every=1000,variable_param=False):
+        def simulate(self,print_every=1000,variable_param=False,equiangulate=True):
             """
             Evolve the SPV.
 
@@ -1085,6 +1085,10 @@ class Tissue:
                 F_get = self.get_F_periodic_param
             else:
                 F_get = self.get_F_periodic
+            if equiangulate is True:
+                triangulate = self.triangulate_periodic
+            else:
+                triangulate = self._triangulate_periodic
             n_t = self.t_span.size
             self.n_t = n_t
             x = self.x0.copy()
@@ -1096,7 +1100,7 @@ class Tissue:
             for i in range(n_t):
                 if i % print_every == 0:
                     print(i / n_t * 100, "%")
-                self.triangulate_periodic(x)
+                triangulate(x)
                 self.tri_save[i] = self.tris
                 self.assign_vertices()
                 self.get_A_periodic(self.neighbours,self.vs)
