@@ -115,11 +115,11 @@ if __name__ == "__main__":
         for i in range(int(sys.argv[3])):
             for run in range(2):
                 try:
-                    tri_save = np.load("tri_save_fsorted/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
+                    tri_save = np.load("from_sorted/tri_save/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
                     tri_save = tri_save.reshape(tri_save.shape[0], -1, 3)
-                    x_save = np.load("x_save_fsorted/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
+                    x_save = np.load("from_sorted/x_save/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
                     x_save = x_save.reshape(x_save.shape[0], -1, 2)
-                    c_types = np.load("c_types_fsorted/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
+                    c_types = np.load("from_sorted/c_types/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
 
                     vor.n_t = tri_save.shape[0]
                     vor.n_c = x_save.shape[1]
@@ -138,7 +138,7 @@ if __name__ == "__main__":
                     skip = int(vor.n_t / 100)
                     rads, L_star = get_L_star(vor.x_save, skip, 10, vor.L, vor.c_types, res=40)
 
-                    np.savez_compressed("analysis_fsorted/%d_%d.npz" % (Id,i+ int(sys.argv[3])*run), n_islands=n_islands, n_bound=n_bound, L_star=L_star,
+                    np.savez_compressed("from_sorted/analysis/%d_%d.npz" % (Id,i+ int(sys.argv[3])*run), n_islands=n_islands, n_bound=n_bound, L_star=L_star,
                                             mean_self=mean_self)
                 except FileNotFoundError:
                     print("False")

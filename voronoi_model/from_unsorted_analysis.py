@@ -44,7 +44,7 @@ sm = plt.cm.ScalarMappable(cmap=plt.cm.inferno, norm=plt.Normalize(vmax=final_me
 sm._A = []
 cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
 cl.set_label(r"$N_{clust}$")
-ax.set(xlabel=r"$v_0$",ylabel=r"$\beta$")
+ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
 fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
 fig.savefig("paper_plots/Fig1/N_clust_phase_diag.pdf",dpi=300)
 
@@ -73,7 +73,7 @@ sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmax=final_mean_L_star.
 sm._A = []
 cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
 cl.set_label(r"$L^*$")
-ax.set(xlabel=r"$v_0$",ylabel=r"$\beta$")
+ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
 fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
 fig.savefig("paper_plots/Fig1/L_star_phase_diag.pdf",dpi=300)
 
@@ -86,7 +86,7 @@ sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmax=final_mean_dL_star
 sm._A = []
 cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
 cl.set_label(r"$\Delta L^*$")
-ax.set(xlabel=r"$v_0$",ylabel=r"$\beta$")
+ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
 fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
 fig.savefig("paper_plots/Fig1/dL_star_phase_diag.pdf",dpi=300)
 
@@ -120,7 +120,7 @@ sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmax=final_mean_mean_se
 sm._A = []
 cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
 cl.set_label(r"$\phi_{self}$")
-ax.set(xlabel=r"$v_0$",ylabel=r"$\beta$")
+ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
 fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
 fig.savefig("paper_plots/Fig1/mean_self_phase_diag.pdf",dpi=300)
 
@@ -135,6 +135,40 @@ sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmax=final_mean_dmean_s
 sm._A = []
 cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
 cl.set_label(r"$\Delta \phi_{self}$")
-ax.set(xlabel=r"$v_0$",ylabel=r"$\beta$")
+ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
 fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
 fig.savefig("paper_plots/Fig1/dmean_self_phase_diag.pdf",dpi=300)
+
+
+"""Time courses"""
+
+
+cmap = plt.cm.plasma
+cols = cmap(np.linspace(0,1,N))
+fig, ax = plt.subplots(figsize=(3,2.5))
+for i in range(N):
+    ax.plot(tspan_sample,mean_self[5,i].mean(axis=0),color=cols[i])
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmax=np.log10(beta_range.max()), vmin=np.log10(beta_range).min()))
+sm._A = []
+cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
+cl.set_label(r"$log_{10} \ \beta$")
+ax.set(xlabel=r"$t$",ylabel=r"$\phi_{self}$")
+fig.subplots_adjust(top=0.8, bottom=0.25, left=0.20, right=0.75)
+fig.savefig("paper_plots/Fig1/mean_self_timecourse.pdf",dpi=300)
+
+
+t0 = 10
+t1 = -1
+tspan_sample = np.linspace(0,500,100)
+
+from scipy.stats import linregress
+
+ms_grad = np.zeros((N,N,rep))
+for i in range(N):
+    for j in range(N):
+        for k in range(rep):
+            ms_grad[i,j,k] = linregress(tspan_sample[t0:t1],mean_self[i,j,k,t0:t1])[0]
+
+fig, ax = plt.subplots()
+ax.imshow(flipim(ms_grad.mean(axis=2)))
+fig.show()
