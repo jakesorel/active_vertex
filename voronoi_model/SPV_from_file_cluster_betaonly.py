@@ -37,7 +37,7 @@ def run_simulation(X):
 
     vor.set_t_span(0.025,500)
 
-    vor.simulate(equiangulate=False)
+    vor.simulate(equiangulate=True)
 
     np.savez_compressed("from_unsorted_beta_only/tri_save/%d_%d_%d.npz"%(Id,rep,run),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
     np.savez_compressed("from_unsorted_beta_only/x_save/%d_%d_%d.npz"%(Id,rep,run),vor.x_save.reshape(vor.n_t,2*vor.n_c))
