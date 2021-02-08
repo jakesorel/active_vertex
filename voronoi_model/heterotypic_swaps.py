@@ -72,7 +72,7 @@ def get_n_het_swap(tri_save,c_types):
         single_swap = (neigh_t == -1).sum(axis=1)==2
         if not single_swap.all():
             tri_t = tri_t[single_swap]
-            neigh_t = neigh_t[single_swap]
+            neigh_t = get_neighbours(tri_t)
         k2_t = get_k2(tri_t,neigh_t)
         tri_i, i = np.nonzero(neigh_t != -1)
         c_types_t = c_types[tri_t]
@@ -82,9 +82,7 @@ def get_n_het_swap(tri_save,c_types):
         c_types_opp = c_types[tri_t[neigh_t[tri_i,i],k2_t[tri_i,i]]]
         het_swap = (c_types_ti != c_types_tim1) * (c_types_ti != c_types_tip1)*(c_types_ti == c_types_opp)
         n_het_swap[ti] = het_swap.sum()/2
-
     n_het_swap_tot = n_het_swap.sum()
-
     return changed_t,n_het_swap,n_het_swap_tot
 
 if __name__ == "__main__":

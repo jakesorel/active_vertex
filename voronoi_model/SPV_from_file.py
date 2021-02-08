@@ -17,7 +17,7 @@ vor.L = 9
 
 p0 = 3.9
 r = 10
-vor.v0 = 0.025
+vor.v0 = 0.075
 vor.Dr = 1e-1
 beta = 0.01
 
@@ -31,7 +31,7 @@ vor.k = 0
 vor.set_interaction(W = beta*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
 
 
-vor.set_t_span(0.025,100)
+vor.set_t_span(0.025,500)
 print(vor.t_span.size)
 
 vor.simulate()
