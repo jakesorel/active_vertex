@@ -3,7 +3,7 @@
 ((N = "$1"))
 
 mkdir from_unsorted_beta_only
-mkdir from_unsorted_beta_only/x_save from_unsorted_beta_only/tri_save from_unsorted/c_types
+mkdir from_unsorted_beta_only/x_save from_unsorted_beta_only/tri_save from_unsorted_beta_only/c_types
 
 for i in $(seq 0 $(($N-1)))
 do
