@@ -210,15 +210,49 @@ fig.savefig("paper_plots/Fig1/L_star_timecourse.pdf",dpi=300)
 
 
 
-def get_n_het_swap(X):
+def get_n_het_swap_tot(X):
     Id, Rep = X
     try:
         FILE = np.load("from_unsorted/het_swaps/%d_%d.npz" % (Id,Rep))
-        return FILE["n_het_swap"]
+        return FILE["n_het_swap_tot"]
     except FileNotFoundError:
         return np.nan
 
 
+
+
+def get_n_het_swap_tot(X,t0=10000):
+    Id, Rep = X
+    try:
+        FILE = np.load("from_unsorted/het_swaps/%d_%d.npz" % (Id,Rep))
+        n_het_swap,changed_t = FILE["n_het_swap"], FILE["changed_t"]
+        return n_het_swap[changed_t>t0].sum()
+    except FileNotFoundError:
+        return np.nan
+
+
+
+
 num_cores = multiprocessing.cpu_count()
-n_het_swap = Parallel(n_jobs=num_cores)(delayed(get_n_het_swap)(inputt) for inputt in inputs)
-n_het_swap = np.array(n_het_swap).reshape(N,N,rep)
+n_het_swap_tot = Parallel(n_jobs=num_cores)(delayed(get_n_het_swap_tot)(inputt) for inputt in inputs)
+n_het_swap_tot = np.array(n_het_swap_tot).reshape(N,N,rep)
+
+fig, ax = plt.subplots()
+ax.imshow(flipim(n_het_swap_tot.mean(axis=2)),vmax = np.percentile(n_het_swap_tot,75))
+fig.show()
+
+vmin = n_het_swap_tot.min()
+vmax = np.percentile(n_het_swap_tot,90)
+
+cmap = plt.cm.plasma
+fig, ax = plt.subplots(figsize=(3,2.5))
+extent, aspect = make_extent(v0_range,np.log10(beta_range))
+ax.imshow(flipim(n_het_swap_tot.mean(axis=2)),extent=extent,aspect=aspect,cmap=cmap,vmax = np.percentile(n_het_swap_tot,75))
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmax=vmax, vmin=vmin))
+sm._A = []
+cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
+cl.set_label(r"$\phi_{self}$")
+ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
+fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
+# fig.show()
+fig.savefig("paper_plots/Fig1/n_het_swap.pdf",dpi=300)
