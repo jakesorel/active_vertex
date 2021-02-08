@@ -32,7 +32,26 @@ def get_neighbours(tri):
                     neigh[neighb,np.mod(2-l,3)] = j
     return neigh
 
+def get_n_het_swap(tri_save,c_types):
+    ##1. filter no change
+    unchanged = ((tri_save[1:] - tri_save[:-1]) == 0).all(axis=(1, 2))
+    changed_t = np.nonzero(~unchanged)[0]
 
+    # 2. select for the triangles that have changed for a given time t
+    n_het_swap = np.zeros_like(changed_t)
+    for ti, t in enumerate(changed_t):
+        same_rows = (tri_save[t] == tri_save[t + 1]).all(axis=1)
+        tri_t = tri_save[t, ~same_rows]
+
+        neigh_t = get_neighbours(tri_t)
+        tri_i, i = np.nonzero(neigh_t != -1)
+        c_types_t = c_types[tri_t]
+        c_types_ti = c_types_t[tri_i, i]
+        c_types_tip1 = c_types_t[tri_i, np.mod(i + 1, 3)]
+        c_types_tim1 = c_types_t[tri_i, np.mod(i - 1, 3)]
+        het_swap = (c_types_ti != c_types_tim1) * (c_types_ti != c_types_tip1)
+        n_het_swap[ti] = het_swap.sum()
+    return n_het_swap
 
 if __name__ == "__main__":
 
@@ -43,26 +62,7 @@ if __name__ == "__main__":
                     tri_save = np.load("from_unsorted/tri_save/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
                     tri_save = tri_save.reshape(tri_save.shape[0], -1, 3)
                     c_types = np.load("from_unsorted/c_types/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
-
-                    ##1. filter no change
-                    unchanged = ((tri_save[1:] - tri_save[:-1]) == 0).all(axis=(1, 2))
-                    changed_t = np.nonzero(~unchanged)[0]
-
-                    # 2. select for the triangles that have changed for a given time t
-                    n_het_swap = np.zeros_like(changed_t)
-                    for ti, t in enumerate(changed_t):
-                        same_rows = (tri_save[t] == tri_save[t + 1]).all(axis=1)
-                        tri_t = tri_save[t, ~same_rows]
-
-                        neigh_t = get_neighbours(tri_t)
-                        tri_i, i = np.nonzero(neigh_t != -1)
-                        c_types_t = c_types[tri_t]
-                        c_types_ti = c_types_t[tri_i, i]
-                        c_types_tip1 = c_types_t[tri_i, np.mod(i + 1, 3)]
-                        c_types_tim1 = c_types_t[tri_i, np.mod(i - 1, 3)]
-                        het_swap = (c_types_ti != c_types_tim1) * (c_types_ti != c_types_tip1)
-                        n_het_swap[ti] = het_swap.sum()
-
+                    n_het_swap = get_n_het_swap(tri_save,c_types)
                     np.savez_compressed("from_unsorted/het_swaps/%d_%d.npz" % (Id,i + run*int(sys.argv[3])), n_het_swap=n_het_swap)
                 except FileNotFoundError:
                     print("False")
