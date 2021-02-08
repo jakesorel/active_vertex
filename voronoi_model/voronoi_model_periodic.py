@@ -13,7 +13,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib import cm
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
-from t1_functions import *
+from voronoi_model.t1_functions import *
 
 class Cell:
     def __init__(self):

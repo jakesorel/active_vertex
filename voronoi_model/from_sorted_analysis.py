@@ -23,7 +23,7 @@ inputs = np.array([ID_mat.ravel(),RR.ravel()]).T
 def get_n_islands(X):
     Id, Rep = X
     try:
-        FILE = np.load("from_unsorted/analysis/%d_%d.npz" % (Id,Rep))
+        FILE = np.load("from_sorted/analysis/%d_%d.npz" % (Id,Rep))
         return FILE["n_islands"]
     except FileNotFoundError:
         return np.nan
@@ -34,9 +34,9 @@ n_islands = np.array(n_islands).reshape(N,N,rep,2,100)
 
 final_mean_n_islands = n_islands.sum(axis=3).mean(axis=2)[:,:,-1]
 
-vmax,vmin = 9.6,2
 make_directory("paper_plots")
-make_directory("paper_plots/Fig1")
+make_directory("paper_plots/Fig2")
+vmax,vmin = 9.6,2
 
 fig, ax = plt.subplots(figsize=(3,2.5))
 extent, aspect = make_extent(v0_range,np.log10(beta_range))
@@ -47,13 +47,13 @@ cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="v
 cl.set_label(r"$N_{clust}$")
 ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
 fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
-fig.savefig("paper_plots/Fig1/N_clust_phase_diag.pdf",dpi=300)
+fig.savefig("paper_plots/Fig2/N_clust_phase_diag.pdf",dpi=300)
 
 
 def get_L_star(X):
     Id, Rep = X
     try:
-        FILE = np.load("from_unsorted/analysis/%d_%d.npz" % (Id,Rep))
+        FILE = np.load("from_sorted/analysis/%d_%d.npz" % (Id,Rep))
         return FILE["L_star"]
     except FileNotFoundError:
         return np.nan
@@ -76,7 +76,7 @@ cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="v
 cl.set_label(r"$L^*$")
 ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
 fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
-fig.savefig("paper_plots/Fig1/L_star_phase_diag.pdf",dpi=300)
+fig.savefig("paper_plots/Fig2/L_star_phase_diag.pdf",dpi=300)
 
 
 cmap = plt.cm.plasma
@@ -89,7 +89,7 @@ cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="v
 cl.set_label(r"$\Delta L^*$")
 ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
 fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
-fig.savefig("paper_plots/Fig1/dL_star_phase_diag.pdf",dpi=300)
+fig.savefig("paper_plots/Fig2/dL_star_phase_diag.pdf",dpi=300)
 
 
 
@@ -97,7 +97,7 @@ fig.savefig("paper_plots/Fig1/dL_star_phase_diag.pdf",dpi=300)
 def get_mean_self(X):
     Id, Rep = X
     try:
-        FILE = np.load("from_unsorted/analysis/%d_%d.npz" % (Id,Rep))
+        FILE = np.load("from_sorted/analysis/%d_%d.npz" % (Id,Rep))
         return FILE["mean_self"]
     except FileNotFoundError:
         return np.nan
@@ -112,20 +112,19 @@ final_mean_dmean_self = dmean_self.mean(axis=2)
 final_mean_mean_self = mean_self.mean(axis=2)[:,:,-1]
 
 cmap = plt.cm.viridis
-
 vmax = 0.85
 vmin = 0.5
 
 fig, ax = plt.subplots(figsize=(3,2.5))
 extent, aspect = make_extent(v0_range,np.log10(beta_range))
 ax.imshow(flipim(final_mean_mean_self),extent=extent,aspect=aspect,cmap=cmap,vmin=vmin,vmax=vmax)
-sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmax=vmax, vmin=vmin))
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmax=vmax,vmin=vmin))
 sm._A = []
 cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
 cl.set_label(r"$\phi_{self}$")
 ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
 fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
-fig.savefig("paper_plots/Fig1/mean_self_phase_diag.pdf",dpi=300)
+fig.savefig("paper_plots/Fig2/mean_self_phase_diag.pdf",dpi=300)
 
 
 cmap = plt.cm.viridis
@@ -140,7 +139,7 @@ cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="v
 cl.set_label(r"$\Delta \phi_{self}$")
 ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
 fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
-fig.savefig("paper_plots/Fig1/dmean_self_phase_diag.pdf",dpi=300)
+fig.savefig("paper_plots/Fig2/dmean_self_phase_diag.pdf",dpi=300)
 
 
 """Time courses"""
@@ -189,19 +188,3 @@ for i in range(N):
 fig, ax = plt.subplots()
 ax.imshow(flipim(ms_grad.mean(axis=2)))
 fig.show()
-
-
-dL_star = (L_star.T - L_star[:,:,:,0].T).T
-
-cmap = plt.cm.plasma
-cols = cmap(np.linspace(0,1,N))
-fig, ax = plt.subplots(figsize=(3,2.5))
-for i in range(N):
-    ax.plot(tspan_sample,dL_star[5,i,:].mean(axis=0),color=cols[i])
-sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmax=np.log10(beta_range.max()), vmin=np.log10(beta_range).min()))
-sm._A = []
-cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
-cl.set_label(r"$log_{10} \ \beta$")
-ax.set(xlabel=r"$t$",ylabel=r"$\phi_{self}$")
-fig.subplots_adjust(top=0.8, bottom=0.25, left=0.20, right=0.75)
-fig.savefig("paper_plots/Fig1/L_star_timecourse.pdf",dpi=300)
