@@ -205,3 +205,20 @@ cl.set_label(r"$log_{10} \ \beta$")
 ax.set(xlabel=r"$t$",ylabel=r"$\phi_{self}$")
 fig.subplots_adjust(top=0.8, bottom=0.25, left=0.20, right=0.75)
 fig.savefig("paper_plots/Fig1/L_star_timecourse.pdf",dpi=300)
+
+
+
+
+
+def get_n_het_swap(X):
+    Id, Rep = X
+    try:
+        FILE = np.load("from_unsorted/het_swaps/%d_%d.npz" % (Id,Rep))
+        return FILE["n_het_swap"]
+    except FileNotFoundError:
+        return np.nan
+
+
+num_cores = multiprocessing.cpu_count()
+n_het_swap = Parallel(n_jobs=num_cores)(delayed(get_n_het_swap)(inputt) for inputt in inputs)
+n_het_swap = np.array(n_het_swap).reshape(N,N,rep)

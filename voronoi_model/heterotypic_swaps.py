@@ -51,7 +51,10 @@ def get_n_het_swap(tri_save,c_types):
         c_types_tim1 = c_types_t[tri_i, np.mod(i - 1, 3)]
         het_swap = (c_types_ti != c_types_tim1) * (c_types_ti != c_types_tip1)
         n_het_swap[ti] = het_swap.sum()
-    return n_het_swap
+
+    n_het_swap_tot = n_het_swap.sum()
+
+    return changed_t,n_het_swap,n_het_swap_tot
 
 if __name__ == "__main__":
 
@@ -62,8 +65,8 @@ if __name__ == "__main__":
                     tri_save = np.load("from_unsorted/tri_save/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
                     tri_save = tri_save.reshape(tri_save.shape[0], -1, 3)
                     c_types = np.load("from_unsorted/c_types/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
-                    n_het_swap = get_n_het_swap(tri_save,c_types)
-                    np.savez_compressed("from_unsorted/het_swaps/%d_%d.npz" % (Id,i + run*int(sys.argv[3])), n_het_swap=n_het_swap)
+                    changed_t,n_het_swap,n_het_swap_tot = get_n_het_swap(tri_save,c_types)
+                    np.savez_compressed("from_unsorted/het_swaps/%d_%d.npz" % (Id,i + run*int(sys.argv[3])),changed_t=changed_t, n_het_swap=n_het_swap,n_het_swap_tot = n_het_swap_tot)
                 except FileNotFoundError:
                     print("False")
     do_analysis(int(sys.argv[1]))
