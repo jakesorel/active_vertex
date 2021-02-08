@@ -4,7 +4,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 # import dask
 # from dask.distributed import Client
-
+import seaborn as sb
 
 """
 To ensure we are measuring bone-fide sorting (i.e. genuine topological changes in cell-neighbourhoods), we want to 
@@ -63,6 +63,34 @@ def true_randomize(x, pE=0.5, n_trial=1000):
                                connected_components(csgraph=csr_matrix(AdjB), directed=False)[0]
         n_islands[i] = A_islands + B_islands
     return c_type_mat[np.where(n_islands == n_islands.max())[0][0]]
+
+
+
+def null_model(x, pE=0.5, n_trial=1000):
+    vor = Tissue()
+    vor.generate_cells(600)
+    vor.x = x
+    vor.x0 = vor.x
+    vor.n_c = vor.x0.shape[0]
+    vor.n_C = vor.n_c
+    vor.L = 9
+    vor.set_interaction(W=np.array([[0, 1], [1, 0]]), pE=pE, randomize=True)
+
+    vor._triangulate_periodic(x)
+    c_type_mat = np.zeros((n_trial, vor.n_c),dtype=np.int64)
+    n_islands = np.zeros(n_trial)
+    for i in range(n_trial):
+        np.random.shuffle(vor.c_types)
+        c_type_mat[i] = vor.c_types
+        Adj = np.zeros((vor.n_c, vor.n_c), dtype=np.float32)
+        Adj[vor.tris, np.roll(vor.tris, -1, axis=1)] = 1
+        AdjA = Adj[vor.c_types == 0][:, vor.c_types == 0]
+        AdjB = Adj[vor.c_types == 1][:, vor.c_types == 1]
+        A_islands, B_islands = connected_components(csgraph=csr_matrix(AdjA), directed=False)[0], \
+                               connected_components(csgraph=csr_matrix(AdjB), directed=False)[0]
+        n_islands[i] = A_islands + B_islands
+    return n_islands
+
 
 
 
@@ -134,6 +162,7 @@ def make_sorted_lattice(pE=0.5, n_trial=1000):
 
 
 
+
 if __name__ == "__main__":
     n_rep = 25
     dir_name = "lattices"
@@ -175,5 +204,13 @@ if __name__ == "__main__":
     #
     #
 
+    ###null_model
+    x = generate_lattice()
+    n_islands = null_model(x,n_trial=10000)
+    fig, ax = plt.subplots(figsize=(3.5,2))
+    sb.histplot(n_islands,bins=np.arange(np.amax(n_islands)),ax=ax,discrete=True,stat="density")
+    ax.set(xlabel=r"$N_{clust}$",ylabel=r"$P(X = N_{clust})$")
+    fig.subplots_adjust(top=0.8, bottom=0.25, left=0.2, right=0.8)
+    fig.savefig("paper_plots/Fig1/prob_dist_fn_N_clust.pdf",dpi=300)
 
 

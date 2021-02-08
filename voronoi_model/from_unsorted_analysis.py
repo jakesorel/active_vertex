@@ -221,7 +221,7 @@ def get_n_het_swap_tot(X):
 
 
 
-def get_n_het_swap_tot(X,t0=10000):
+def get_n_het_swap_tot(X,t0=2000):
     Id, Rep = X
     try:
         FILE = np.load("from_unsorted/het_swaps/%d_%d.npz" % (Id,Rep))
@@ -237,22 +237,46 @@ num_cores = multiprocessing.cpu_count()
 n_het_swap_tot = Parallel(n_jobs=num_cores)(delayed(get_n_het_swap_tot)(inputt) for inputt in inputs)
 n_het_swap_tot = np.array(n_het_swap_tot).reshape(N,N,rep)
 
+
 fig, ax = plt.subplots()
-ax.imshow(flipim(n_het_swap_tot.mean(axis=2)),vmax = np.percentile(n_het_swap_tot,75))
+ax.imshow(flipim(n_het_swap_tot.mean(axis=2)))
 fig.show()
 
-vmin = n_het_swap_tot.min()
-vmax = np.percentile(n_het_swap_tot,90)
+mean_swap_rate = n_het_swap_tot.mean(axis=2)/((20000-2000)*(0.025))
 
-cmap = plt.cm.plasma
+vmin = mean_swap_rate.min()
+vmax = 0.005#np.percentile(n_het_swap_tot.mean(axis=2),50)
+
+cmap = plt.cm.Reds
 fig, ax = plt.subplots(figsize=(3,2.5))
 extent, aspect = make_extent(v0_range,np.log10(beta_range))
-ax.imshow(flipim(n_het_swap_tot.mean(axis=2)),extent=extent,aspect=aspect,cmap=cmap,vmax = np.percentile(n_het_swap_tot,75))
+ax.imshow(flipim(mean_swap_rate),extent=extent,aspect=aspect,cmap=cmap,vmax = vmax)
 sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmax=vmax, vmin=vmin))
 sm._A = []
 cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
-cl.set_label(r"$\phi_{self}$")
+cl.formatter.set_powerlimits((0, 0))
+cl.set_label(r"$\frac{dN_{swap}}{dt}$")
 ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
 fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
 # fig.show()
 fig.savefig("paper_plots/Fig1/n_het_swap.pdf",dpi=300)
+
+
+vals = np.log10(mean_swap_rate).copy()
+vals[np.isinf(vals)] = np.nan
+
+vmin = np.nanmin(vals)
+vmax = np.nanpercentile(vals,90)
+cmap = plt.cm.Reds
+fig, ax = plt.subplots(figsize=(3.15,2.5))
+extent, aspect = make_extent(v0_range,np.log10(beta_range))
+ax.imshow(flipim(np.log10(mean_swap_rate)),extent=extent,aspect=aspect,cmap=cmap,vmin=vmin,vmax=vmax)
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmax=vmax, vmin=vmin))
+sm._A = []
+cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
+cl.formatter.set_powerlimits((0, 0))
+cl.set_label(r"$log_{10} \left(\frac{dN_{swap}}{dt}\right)$")
+ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
+fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.75)
+# fig.show()
+fig.savefig("paper_plots/Fig1/n_het_swap_log.pdf",dpi=300)
