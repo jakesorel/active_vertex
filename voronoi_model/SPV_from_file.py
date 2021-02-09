@@ -18,6 +18,8 @@ vor.L = 9
 p0 = 3.9
 r = 10
 vor.v0 = 0.075
+# vor.v0 = np.random.normal(0.075,0.075,vor.n_C)
+# vor.v0 = np.column_stack((vor.v0,vor.v0))
 vor.Dr = 1e-1
 beta = 0.01
 
@@ -34,7 +36,7 @@ vor.set_interaction(W = beta*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
 vor.set_t_span(0.025,500)
 print(vor.t_span.size)
 
-vor.simulate()
+vor.simulate(equiangulate=False)
 vor.plot_scatter = False
 
 

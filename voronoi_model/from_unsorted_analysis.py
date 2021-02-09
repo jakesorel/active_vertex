@@ -165,7 +165,7 @@ cmap = plt.cm.plasma
 cols = cmap(np.linspace(0,1,N))
 fig, ax = plt.subplots(figsize=(3,2.5))
 for i in range(N):
-    ax.plot(tspan_sample,n_islands[5,i].sum(axis=1).mean(axis=0),color=cols[i])
+    ax.plot(tspan_sample,n_islands[7,i].sum(axis=1).mean(axis=0),color=cols[i])
 sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmax=np.log10(beta_range.max()), vmin=np.log10(beta_range).min()))
 sm._A = []
 cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
