@@ -7,47 +7,47 @@ from os import path
 
 def run_simulation(X):
     sv0, beta, Id,rep,run = X
-    if not path.exists("from_sorted_v0_vary/tri_save/%d_%d_%d.npz"%(Id,rep,run)):
-        li = rep + run*int(sys.argv[3])
-        dir_name = "lattices"
-        x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
-        c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,li)).astype(np.int64)
-        vor = Tissue()
-        vor.generate_cells(600)
-        vor.x = x
-        vor.x0 = vor.x
-        vor.n_c = vor.x0.shape[0]
-        vor.n_C = vor.n_c
-        vor.L = 9
+    # if not path.exists("from_sorted_v0_vary/tri_save/%d_%d_%d.npz"%(Id,rep,run)):
+    li = rep + run*int(sys.argv[3])
+    dir_name = "lattices"
+    x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
+    c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,li)).astype(np.int64)
+    vor = Tissue()
+    vor.generate_cells(600)
+    vor.x = x
+    vor.x0 = vor.x
+    vor.n_c = vor.x0.shape[0]
+    vor.n_C = vor.n_c
+    vor.L = 9
 
 
-        r = 10
-        # vor.v0 = v0
-        vor.v0 = np.random.lognormal(np.log(0.08), sv0, vor.n_C)
+    r = 10
+    # vor.v0 = v0
+    vor.v0 = np.random.lognormal(np.log(0.08), sv0, vor.n_C)
 
-        vor.v0 = np.column_stack((vor.v0, vor.v0))
-        vor.Dr = 1e-1
-        beta = beta
+    vor.v0 = np.column_stack((vor.v0, vor.v0))
+    vor.Dr = 1e-1
+    beta = beta
 
-        vor.kappa_A = 1
-        vor.kappa_P = 1/r
-        vor.A0 = 1
-        vor.P0 = 3.9
-        vor.a = 0.3
-        vor.k = 0
+    vor.kappa_A = 1
+    vor.kappa_P = 1/r
+    vor.A0 = 1
+    vor.P0 = 3.9
+    vor.a = 0.3
+    vor.k = 0
 
-        A_mask = vor.x[:, 0] < vor.L / 2
-        c_types = np.zeros(vor.n_c, dtype=np.int64)
-        c_types[~A_mask] = 1
-        vor.set_interaction(W=beta * np.array([[0, 1], [1, 0]]), pE=0.5, c_types=c_types)
+    A_mask = vor.x[:, 0] < vor.L / 2
+    c_types = np.zeros(vor.n_c, dtype=np.int64)
+    c_types[~A_mask] = 1
+    vor.set_interaction(W=beta * np.array([[0, 1], [1, 0]]), pE=0.5, c_types=c_types)
 
-        vor.set_t_span(0.025,500)
+    vor.set_t_span(0.025,500)
 
-        vor.simulate(equiangulate=False)
+    vor.simulate(equiangulate=False)
 
-        np.savez_compressed("from_sorted_v0_vary/tri_save/%d_%d_%d.npz"%(Id,rep,run),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
-        np.savez_compressed("from_sorted_v0_vary/x_save/%d_%d_%d.npz"%(Id,rep,run),vor.x_save.reshape(vor.n_t,2*vor.n_c))
-        np.savez_compressed("from_sorted_v0_vary/c_types/%d_%d_%d.npz"%(Id,rep,run),vor.c_types)
+    np.savez_compressed("from_sorted_v0_vary/tri_save/%d_%d_%d.npz"%(Id,rep,run),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
+    np.savez_compressed("from_sorted_v0_vary/x_save/%d_%d_%d.npz"%(Id,rep,run),vor.x_save.reshape(vor.n_t,2*vor.n_c))
+    np.savez_compressed("from_sorted_v0_vary/c_types/%d_%d_%d.npz"%(Id,rep,run),vor.c_types)
 
 
 
