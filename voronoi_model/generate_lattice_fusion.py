@@ -2,13 +2,11 @@ from voronoi_model_periodic import *
 from t1_functions import *
 import numpy as np
 import matplotlib.pyplot as plt
-import dask
-from dask.distributed import Client
 import sys
 import os
 
 def simulate(X):
-    p0, beta, Id = X
+    beta, Id = X
     dir_name = "lattices"
     x = np.loadtxt("%s/x_%d.txt"%(dir_name,0))
     vor = Tissue()
@@ -20,8 +18,8 @@ def simulate(X):
     vor.L = 9
 
 
-    p0 = p0
-    r = 5
+    p0 = 3.9
+    r = 10
     v0 = 0
     vor.Dr = 1e-1
     beta = beta
@@ -31,7 +29,7 @@ def simulate(X):
     vor.A0 = 1
     vor.P0 = p0
     vor.a = 0.3
-    vor.k = 1
+    vor.k = 0
 
 
     A_mask = vor.x[:,0]<vor.L/2
@@ -48,7 +46,7 @@ def simulate(X):
 
     vor.v0 = v0
 
-    vor.simulate()
+    vor.simulate(equiangulate=False)
 
     dir_name = "fusion_lattices"
     if not os.path.exists(dir_name):
@@ -66,8 +64,8 @@ if __name__ == "__main__":
 
     Id = int(sys.argv[1])
     N = int(sys.argv[2])
-    p0_range = np.linspace(3.5,4,N)
+    # p0_range = np.linspace(3.5,4,N)
     beta_range = np.logspace(-3,-1,N)
-    PP,BB = np.meshgrid(p0_range,beta_range,indexing="ij")
-    p0,beta = PP.take(Id),BB.take(Id)
-    x,c_types = simulate((p0,beta,Id))
+    # PP,BB = np.meshgrid(p0_range,beta_range,indexing="ij")
+    beta = beta_range.take(Id)
+    x,c_types = simulate((beta,Id))
