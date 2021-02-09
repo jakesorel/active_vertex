@@ -37,8 +37,8 @@ def get_lattice_id(p0,beta):
     return np.where((np.abs(PP.ravel()-p0)<1e-16)*(np.abs(BB.ravel()-beta)<1e-16))[0][0]
 
 def simulate(X):
-    p0, beta, Id = X
-    lId = get_lattice_id(p0, beta)
+    beta, Id = X
+    lId = Id
     n_quartets = get_n_quartets(lId)
     n_quartets = np.min((n_quartets,8))
     def evaluate(v0_chosen,rep):
@@ -54,16 +54,16 @@ def simulate(X):
         vor.L = 9
 
 
-        r = 5
+        r = 10
         v0 = 0
         vor.Dr = 1e-1
 
         vor.kappa_A = 1
         vor.kappa_P = 1/r
         vor.A0 = 1
-        vor.P0 = p0
+        vor.P0 = 3.9
         vor.a = 0.3
-        vor.k = 1
+        vor.k = 0
 
 
         vor.c_types = c_types
@@ -103,14 +103,15 @@ def simulate(X):
         return v0opt
 
     v0_opts = np.array([get_v0_opt(rep) for rep in range(n_quartets)])
-    np.savetxt("optv0s/%d.txt"%Id,v0_opts)
+    dir_name = "optv0s"
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+    np.savetxt("%s/%d.txt"%(dir_name,Id),v0_opts)
 
 if __name__ == "__main__":
     Id = int(sys.argv[1])
     N = int(sys.argv[2])
-    p0_range = np.linspace(3.5,4,N)
     beta_range = np.logspace(-3,-1,N)
 
-    PP,BB = np.meshgrid(p0_range,beta_range,indexing="ij")
-    p0,beta = PP.take(Id),BB.take(Id)
-    simulate((p0,beta,Id))
+    beta = beta_range.take(Id)
+    simulate((beta,Id))
