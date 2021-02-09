@@ -56,7 +56,7 @@ if __name__ == "__main__":
     N = int(sys.argv[2])
     rep = int(sys.argv[3])
     run = int(sys.argv[4])
-    sv0_range = np.linspace(0,0.2,N)
+    sv0_range = np.linspace(0,0.5,N)
     beta_range = np.logspace(-3,-1,N)
 
     sVV,BB = np.meshgrid(sv0_range,beta_range,indexing="ij")

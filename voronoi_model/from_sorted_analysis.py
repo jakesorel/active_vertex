@@ -188,3 +188,51 @@ for i in range(N):
 fig, ax = plt.subplots()
 ax.imshow(flipim(ms_grad.mean(axis=2)))
 fig.show()
+
+
+
+####################################
+#variation in v0
+####################################
+
+
+
+N = 12
+rep = 12
+# p0_range = np.linspace(3.5, 4, N)
+# v0_range = np.linspace(5e-3, 1e-1, N)
+# beta_range = np.linspace(0, 0.3)
+sv0_range = np.linspace(0, 0.2, N)
+beta_range = np.logspace(-3, -1, N)
+rep_range = np.arange(rep)
+sVV, BB,RR = np.meshgrid(sv0_range, beta_range,rep_range, indexing="ij")
+ID_mat = np.arange(N**2).astype(int).reshape(N,N)
+ID_mat = np.stack([ID_mat for i in range(rep)],axis=2)
+inputs = np.array([ID_mat.ravel(),RR.ravel()]).T
+
+def get_n_islands(X):
+    Id, Rep = X
+    try:
+        FILE = np.load("from_sorted_v0_vary/analysis/%d_%d.npz" % (Id,Rep))
+        return FILE["mean_self"]
+    except FileNotFoundError:
+        return np.nan
+
+num_cores = multiprocessing.cpu_count()
+n_islands = Parallel(n_jobs=num_cores)(delayed(get_n_islands)(inputt) for inputt in inputs)
+n_islands = np.array(n_islands).reshape(N,N,rep,100)
+final_mean_n_islands = n_islands.mean(axis=2)[:,:,-1]
+
+
+
+fig, ax = plt.subplots(figsize=(3,2.5))
+extent, aspect = make_extent(sv0_range,np.log10(beta_range))
+ax.imshow(flipim(final_mean_n_islands),extent=extent,aspect=aspect,cmap=plt.cm.inferno)#,vmin=vmin,vmax=vmax)
+sm = plt.cm.ScalarMappable(cmap=plt.cm.inferno, norm=plt.Normalize(vmax=vmax, vmin=vmin))
+sm._A = []
+cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
+cl.set_label(r"$N_{clust}$")
+ax.set(xlabel=r"$s_{v_0}$",ylabel=r"$log_{10} \ \beta$")
+fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
+fig.show()
+# fig.savefig("paper_plots/Fig2/N_clust_phase_diag.pdf",dpi=300)
