@@ -48,13 +48,13 @@ def get_lattice_id(p0,beta):
 #     fig.show()
 
 def simulate(X):
-    p0, beta, Id = X
+    beta, Id = X
 
     # p0,beta = 4,1e-3
     # sys.argv[2] = 10
     # rep = 0
 
-    lId = get_lattice_id(p0, beta)
+    lId = Id#get_lattice_id(p0, beta)
     n_quartets = get_n_quartets(lId)
     n_quartets = np.min((8,n_quartets))
     for rep in range(n_quartets):
@@ -71,8 +71,8 @@ def simulate(X):
         vor.L = 9
 
 
-        p0 = p0
-        r = 5
+        p0 = 3.9
+        r = 10
         v0 = 0
         vor.Dr = 1e-1
         beta = beta
@@ -82,7 +82,7 @@ def simulate(X):
         vor.A0 = 1
         vor.P0 = p0
         vor.a = 0.3
-        vor.k = 1
+        vor.k = 0
 
 
         vor.c_types = c_types
@@ -148,16 +148,19 @@ def simulate(X):
 
         n_islands = np.array(vor.get_num_islands(2)).sum(axis=0)[-1]
         swapped = np.sum(vor.v0)==0
-
-        np.savez_compressed("fusion_using_optv0_2/%d_%d.npz"%(Id,rep),n_islands=n_islands,energies_all=energies_all,swapped=swapped)
+        dir_name = "fusion_using_optv0"
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+        np.savez_compressed("fusion_using_optv0/%d_%d.npz"%(Id,rep),n_islands=n_islands,energies_all=energies_all,swapped=swapped)
         print("done")
 
 if __name__ == "__main__":
     Id = int(sys.argv[1])
     N = int(sys.argv[2])
-    p0_range = np.linspace(3.5,4,N)
+    # p0_range = np.linspace(3.5,4,N)
     beta_range = np.logspace(-3,-1,N)
 
-    PP,BB = np.meshgrid(p0_range,beta_range,indexing="ij")
-    p0,beta = PP.take(Id),BB.take(Id)
-    simulate((p0,beta,Id))
+    # PP,BB = np.meshgrid(p0_range,beta_range,indexing="ij")
+    # p0,beta = PP.take(Id),BB.take(Id)
+    beta = beta_range.take(Id)
+    simulate((beta,Id))
