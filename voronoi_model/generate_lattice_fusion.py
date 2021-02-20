@@ -40,7 +40,7 @@ def simulate(X):
     vor.assign_vertices()
 
 
-    vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),pE=0.5,c_types=c_types)
+    vor.set_interaction(W = beta*np.array([[0, 1], [1, 0]]),pE=0.5,c_types=c_types)
     vor.set_t_span(0.025,100)
 
 

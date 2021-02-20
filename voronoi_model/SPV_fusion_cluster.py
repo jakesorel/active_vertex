@@ -100,7 +100,7 @@ def simulate(X):
 
         generate_noise_fixed(vor,Is,thetas)
         c_types[Is[0]] = 0
-        vor.set_interaction(W = (2*beta*vor.P0/r)*np.array([[0, 1], [1, 0]]),pE=0.5,c_types=c_types)
+        vor.set_interaction(W = beta*np.array([[0, 1], [1, 0]]),pE=0.5,c_types=c_types)
 
         vor.v0 = v0*np.ones(vor.n_c).reshape(-1,1)
         for i in Is:
