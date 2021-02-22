@@ -1,7 +1,4 @@
-from voronoi_model.voronoi_model_periodic import *
-from voronoi_model.t1_functions import *
-import multiprocessing
-from joblib import delayed,Parallel
+from voronoi_model_periodic import *
 import sys
 
 def make_directory(dir_name):

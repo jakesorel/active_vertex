@@ -2531,8 +2531,8 @@ def get_mobile_dir(tris,c_types,v_neighbours,neighbours,L,vs,mobile_i,t1_type="f
     m_tris_i = np.arange(tris.shape[0])[m_tri_mask]
     direc_mat,dist_mat = np.ones((m_tris_i.size,2),dtype=np.float64)*np.nan,np.ones(m_tris_i.size,dtype=np.float64)*np.nan
     n_a_neighbours = np.sum(1 - c_types[tris[m_tris_i].ravel()].reshape(-1,3)) - m_tris_i.size ##not a real meausre, but a proxy for number of "A" type neighbours
-    # if (n_a_neighbours==0)*(t1_type == "forward") + (n_a_neighbours>0)*(t1_type=="reverse"):
-    if (n_a_neighbours<2)*(t1_type == "forward") + (n_a_neighbours>0)*(t1_type=="reverse"):
+    if (n_a_neighbours==0)*(t1_type == "forward") + (n_a_neighbours>0)*(t1_type=="reverse"):
+    # if (n_a_neighbours<2)*(t1_type == "forward") + (n_a_neighbours>0)*(t1_type=="reverse"):
         ###small modification here such that minimally 2 A cell neighbours are required. Note the double counting required b.c. of the triangulation
         for j, i in enumerate(m_tris_i):
             tri = tris[i]
