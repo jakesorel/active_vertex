@@ -13,7 +13,6 @@ from matplotlib.collections import PatchCollection
 from matplotlib import cm
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
-from t1_functions import *
 
 class Cell:
     def __init__(self):
@@ -68,6 +67,7 @@ class Tissue:
             self.no_noise_time = None
             self.b_extra = 2
             self.noise = []
+            self.t1_time = False
 
 
             self.plot_forces = False
@@ -1115,7 +1115,51 @@ class Tissue:
             return self.x_save
 
 
-        def simulate_haltv0(self,print_every=1000,variable_param=False,equiangulate=True):
+        def get_t1_forward_cells(self):
+            tc_type = self.c_types[self.tris]
+            two_type1_tris = tc_type.sum(axis=1) == 2
+            Ls = np.nonzero(two_type1_tris)[0]
+            Is, Js = np.nonzero(tc_type[two_type1_tris] == 1)
+            type1_b_cells = self.tris[Ls[Is], Js]
+            type0_cell = tc_type[two_type1_tris] == 0
+            Is, Js = np.nonzero(type0_cell)
+            # near_boundary_cells = np.ones_like(Is,dtype=np.int64)*-1
+            self.forward_cells = np.ones((Is.size), dtype=np.int64) * -1
+            k = 0
+            for i, j in zip(Is, Js):
+                m = Ls[i]
+                opposite_tri = self.v_neighbours[m, j]
+                opposite_cell = np.roll(self.tris[opposite_tri], -self.k2s[m, j])[0]
+                if (self.c_types[opposite_cell] == 1) * (opposite_cell not in type1_b_cells):
+                    # near_boundary_cells[k] = opposite_cell
+                    ordered_tri = np.roll(self.tris[m], -j)
+                    self.forward_cells[k] = opposite_cell
+                    k += 1
+            self.forward_cells = self.forward_cells[:k - 1]
+            self.n_t1_cells = self.forward_cells.shape[0]
+
+        def get_t1_reverse_cells(self):
+            tc_type = self.c_types[self.tris]
+            two_type1_tris = tc_type.sum(axis=1) == 2
+            Ls = np.nonzero(two_type1_tris)[0]
+            Is, Js = np.nonzero(tc_type[two_type1_tris] == 1)
+            self.reverse_cells = np.unique(self.tris[Ls[Is], Js])
+            self.n_t1_cells = self.reverse_cells.shape[0]
+
+        def initialize_t1(self,i,t1_type = "forward"):
+            self.t1_type = t1_type
+            self._triangulate_periodic(self.x)
+            self.triangulate_periodic(self.x)
+            if t1_type == "forward":
+                self.get_t1_forward_cells()
+                self.mobile_i = self.forward_cells[i]
+            if t1_type == "reverse":
+                self.get_t1_reverse_cells()
+                self.mobile_i = self.reverse_cells[i]
+            self.c_types[self.mobile_i] = 0
+
+
+        def simulate_t1(self,print_every=1000,variable_param=False,equiangulate=True):
             """
             Evolve the SPV.
 
@@ -1145,7 +1189,7 @@ class Tissue:
             self.x_save = np.zeros((n_t,self.n_c,2))
             self.tri_save = np.zeros((n_t,self.tris.shape[0],3),dtype=np.int32)
             self.generate_noise()
-            for i in range(n_t):
+            for i,t in enumerate(self.t_span):
                 if i % print_every == 0:
                     print(i / n_t * 100, "%")
                 triangulate(x)
@@ -1155,22 +1199,21 @@ class Tissue:
                 self.get_P_periodic(self.neighbours,self.vs)
                 F = F_get(self.neighbours,self.vs)
                 F_soft = weak_repulsion(self.Cents,self.a,self.k, self.CV_matrix,self.n_c,self.L)
-                x += self.dt*(F + F_soft + self.v0*self.noise[i])
+                x += self.dt*(F + F_soft)
+                x += self.dt*(self.v0*0.01*self.noise[i])
+                if (t > self.no_movement_time):
+                    direc = get_mobile_dir(self.tris,self.c_types,self.v_neighbours,self.neighbours,self.L,self.vs,self.mobile_i,t1_type=self.t1_type)
+                    x[self.mobile_i] += self.dt*direc*self.v0
+                    if ((direc**2).sum() == 0)*(self.t1_time is False):
+                        self.t1_time = t
                 x = np.mod(x,self.L)
                 self.x = x
                 self.x_save[i] = x
-                ###Before was:
-                #if reset_v0(self.Is, self.tris):
-                #   self.v0 *=0
-
-                if np.mod(i,self.haltwait)==0:
-                    if reset_v0(self.Is,self.tris):
-                        self.v0 = self.v0_orig*0
-                    else:
-                        self.v0 = self.v0_orig.copy()
 
             print("Simulation complete")
             return self.x_save
+
+
 
 
         def profile_function(self,function):
@@ -2429,33 +2472,6 @@ def get_F_bend(n_c,CV_matrix,n_C,x,zeta):
     F_bend[n_C:] = F_b
 
     return F_bend
-#
-# @jit(nopython=True,cache=True)
-# def dcosthetadr(ri,rj,rk):
-#     """
-#     If cos(theta_i) = (r_{ji}•r_{ki})/(|r_{ji}||r_{ki}|)
-#
-#     then this function calculates:
-#         \partial cos(theta_i) / \partial r_i (denoted in short hand dC_ri)
-#         \partial cos(theta_i) / \partial r_j (denoted in short hand dC_rj)
-#         \partial cos(theta_i) / \partial r_k (denoted in short hand dC_rk)
-#
-#     :param ri: Array of positions of boundary cell i (n_c - n_C x 2)
-#     :param rj: Array positions of neighbours of i (j) (n_c - n_C x 2)
-#     :param rk: Array of positions of the other neighbour of i (k) (n_c - n_C x 2)
-#     :return: dC_ri, dC_rj,dC_rk
-#     """
-#     rjk = rj - rk
-#     rji = rj - ri
-#     rki = rk - ri
-#     L2_ji = rji[:,0]** 2 + rji[:,1]**2
-#     L2_ki = rki[:,0]**2 + rki[:,1]**2
-#     cos_theta = (rji[:,0]*rki[:,0]+ rji[:,1]*rki[:,1])/(np.sqrt(L2_ji)*np.sqrt(L2_ki))
-#     dC_ri = (rji.T/L2_ji) * (cos_theta - np.sqrt(L2_ji/L2_ki)) + (rki.T/L2_ki) * (cos_theta - np.sqrt(L2_ki/L2_ji))
-#     dC_rj = (rji.T/L2_ji) * (cos_theta + np.sqrt(L2_ji/L2_ki)) - rjk.T
-#     dC_rk = (rki.T/L2_ki) * (cos_theta + np.sqrt(L2_ki/L2_ji)) + rjk.T
-#     return dC_ri.T, dC_rj.T,dC_rk.T
-#
 
 @jit(nopython=True,cache=True)
 def dcosthetadr(ri,rj,rk):
@@ -2484,3 +2500,68 @@ def dcosthetadr(ri,rj,rk):
     dC_rj = (1/(2*nij**3 * nki)*((rij.T * (njk**2 - nki**2)) + (nij**2 * (rjk.T - rki.T))))
     dC_rk = (1/(2*nki**3 * nij)* ((rki.T * (-njk**2 + nij**2) + (nki**2 * (rij.T - rjk.T)))))
     return dC_ri.T, dC_rj.T,dC_rk.T
+
+
+@jit(nopython=True)
+def disp_from_min_dist(x,X,L):
+    disp = np.mod(X - x + L/2,L)-L/2
+    dist = np.sqrt(disp[:,0]**2 + disp[:,1]**2)
+    mindisti = np.argmin(dist)
+    mindist = dist[mindisti]
+    return disp[mindisti]/mindist, mindist
+
+
+@jit(nopython=True)
+def get_mobile_dir(tris,c_types,v_neighbours,neighbours,L,vs,mobile_i,t1_type="forward"):
+    """
+    For a single A cell moving in (forward) or out (reverse) of the main A aggregate
+
+    Mobile_i must be of type "0" (A)
+
+    :param tris:
+    :param mobile_i:
+    :param t1_type:
+    :return:
+    """
+    if t1_type == "forward":
+        tot = 2
+    if t1_type == "reverse":
+        tot = 3
+    m_tri_mask = (tris[:,0] == mobile_i)+(tris[:,1] == mobile_i)+(tris[:,2] == mobile_i)
+    m_tris_i = np.arange(tris.shape[0])[m_tri_mask]
+    direc_mat,dist_mat = np.ones((m_tris_i.size,2),dtype=np.float64)*np.nan,np.ones(m_tris_i.size,dtype=np.float64)*np.nan
+    n_a_neighbours = np.sum(1 - c_types[tris[m_tris_i].ravel()].reshape(-1,3)) - m_tris_i.size ##not a real meausre, but a proxy for number of "A" type neighbours
+    # if (n_a_neighbours==0)*(t1_type == "forward") + (n_a_neighbours>0)*(t1_type=="reverse"):
+    if (n_a_neighbours<2)*(t1_type == "forward") + (n_a_neighbours>0)*(t1_type=="reverse"):
+        ###small modification here such that minimally 2 A cell neighbours are required. Note the double counting required b.c. of the triangulation
+        for j, i in enumerate(m_tris_i):
+            tri = tris[i]
+            v = vs[i]
+            if c_types[tri].sum() ==2: #ensure the two neighbouring cells are of type "1" (B)
+                neigh_v = neighbours[i]
+                neighbour_tris = tris[v_neighbours[i]]
+                neigh_mask = c_types[neighbour_tris.ravel()].reshape(-1,3)
+                neigh_mask = (neigh_mask[:,0]+neigh_mask[:,1]+neigh_mask[:,2]) == tot
+                non_self_mask = neighbour_tris != mobile_i
+                non_self_mask = non_self_mask[:,0]*non_self_mask[:,1]*non_self_mask[:,2]
+                neigh_v = neigh_v[neigh_mask*non_self_mask]
+                # neigh_v_size = neigh_v.size
+                if neigh_v.size == 2:
+                    disp = np.mod(neigh_v.ravel() - v + L/2,L) - L/2
+                    dist = np.sqrt(disp[0]**2 + disp[1]**2)
+                    direc = disp/dist
+                    direc_mat[j], dist_mat[j] = direc, dist
+                if neigh_v.size > 2:
+                    direc,dist = disp_from_min_dist(v,neigh_v,L)
+                    direc_mat[j],dist_mat[j] = direc,dist
+        if np.isnan(dist_mat).all():
+            direc = np.array((0.0,0.0))
+        else:
+            real_mask = ~np.isnan(dist_mat)
+            dist_mat = dist_mat[real_mask]
+            direc_mat = direc_mat[real_mask]
+            direc = direc_mat[np.argmin(dist_mat)]
+
+    else:
+        direc = np.array((0.0,0.0))
+    return direc

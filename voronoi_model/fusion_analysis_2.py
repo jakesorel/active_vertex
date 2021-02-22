@@ -6,8 +6,33 @@ import multiprocessing
 from joblib import Parallel, delayed
 from voronoi_model.plotting_functions import *
 plt.rcParams.update({'pdf.fonttype': 42})
+import seaborn as sb
+import pandas as pd
+
+optv0s = np.zeros((12,8))
+for optv0_file in os.listdir("optv0s"):
+    i = int(optv0_file.split(".txt")[0])
+    optv0s[i] = np.loadtxt("optv0s/%s"%optv0_file)
+
+df_optv0 = pd.DataFrame(optv0s)
+df_optv0.index = np.logspace(-3, -1, 12)
+df_optv0.columns = np.arange(8)
+df_optv0 = df_optv0.melt(ignore_index = False)
+df_optv0.columns = ["Rep","optv0"]
+df_optv0["beta"] = df_optv0.index
 
 
+
+fig, ax = plt.subplots()
+sb.lineplot(data = df_optv0,x = "beta",y="optv0",ax=ax)
+# fig.show()
+# ax.plot(beta_range,optv0s.mean(axis=1))
+# ci = 90
+# ax.fill_between(beta_range,np.percentile(optv0s,100-ci,axis=1),np.percentile(optv0s,ci,axis=1))
+# for optv0 in optv0s.T:
+#     ax.scatter(np.arange(optv0.size),optv0)
+ax.set(xscale="log",yscale="log")
+fig.show()
 
 N = 12
 beta_range = np.logspace(-3, -1, N)
@@ -140,15 +165,21 @@ for i in range(N):
             t0 = E_norm.shape[2] - np.nanargmax(E_norm[i,j])
             E_shift[i,j,t0:t0+E_norm.shape[2]] = E_norm[i,j]
 
-
+dT = 500
+E_shift_crop = E_shift[:,:,E_norm.shape[2] - dT:E_norm.shape[2]+dT]
+# E_shift_crop = (E_shift_crop.T - E_shift_crop[:,:,0].T).T
+fig, ax = plt.subplots()
+ax.scatter(-np.nanmean(E_shift_crop[:,:,-1],axis=1),np.nanmean(np.nanmax(E_shift_crop,axis=-1),axis=1))
+# ax.set(xscale="log",yscale="log")
+fig.show()
 id = 7
 fig, ax = plt.subplots()
 cols = plt.cm.plasma(np.linspace(0,1,N))
-for i in range(6):
+for i in range(N):
     # ax.plot((np.arange(E_norm[0,0].size*2) - E_norm[0,0].size)[::50]*0.025,np.nanmean(E_shift[i],axis=0)[::50],color=cols[i])
-    ax.plot(E_shift[i,id],color=cols[i])
+    ax.plot(E_shift_crop[i,id],color=cols[i])
 # ax.set(ylim=(-0.05,0.05))
-ax.set(xlim=(1200,2200))
+# ax.set(xlim=(1200,2200))
 fig.show()
     t = np.arange(eps.size) - np.argmax(eps)
     ax.plot(t, out[i,5]-out[i,5,0],color=cols[i])

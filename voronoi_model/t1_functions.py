@@ -4,6 +4,88 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from numba import jit
+#
+
+@jit(nopython=True)
+def disp_from_min_dist(x,X,L):
+    disp = np.mod(X - x + L/2,L)-L/2
+    dist = np.sqrt(disp[:,0]**2 + disp[:,1]**2)
+    mindisti = np.argmin(dist)
+    mindist = dist[mindisti]
+    return disp[mindisti]/mindist, mindist
+
+
+@jit(nopython=True)
+def get_mobile_dir(tris,c_types,v_neighbours,neighbours,L,vs,mobile_i,t1_type="forward"):
+    """
+    For a single A cell moving in (forward) or out (reverse) of the main A aggregate
+
+    Mobile_i must be of type "0" (A)
+
+    :param tris:
+    :param mobile_i:
+    :param t1_type:
+    :return:
+    """
+    if t1_type == "forward":
+        tot = 2
+    if t1_type == "reverse":
+        tot = 3
+    m_tri_mask = (tris[:,0] == mobile_i)+(tris[:,1] == mobile_i)+(tris[:,2] == mobile_i)
+    m_tris_i = np.arange(tris.shape[0])[m_tri_mask]
+    direc_mat,dist_mat = np.ones((m_tris_i.size,2),dtype=np.float64)*np.nan,np.ones(m_tris_i.size,dtype=np.float64)*np.nan
+    n_a_neighbours = np.sum(1 - c_types[tris[m_tris_i].ravel()].reshape(-1,3)) - m_tris_i.size ##not a real meausre, but a proxy for number of "A" type neighbours
+    if (n_a_neighbours==0)*(t1_type == "forward") + (n_a_neighbours>0)*(t1_type=="reverse"):
+        for j, i in enumerate(m_tris_i):
+            tri = tris[i]
+            v = vs[i]
+            if c_types[tri].sum() ==2: #ensure the two neighbouring cells are of type "1" (B)
+                neigh_v = neighbours[i]
+                neighbour_tris = tris[v_neighbours[i]]
+                neigh_mask = c_types[neighbour_tris.ravel()].reshape(-1,3)
+                neigh_mask = (neigh_mask[:,0]+neigh_mask[:,1]+neigh_mask[:,2]) == tot
+                non_self_mask = neighbour_tris != mobile_i
+                non_self_mask = non_self_mask[:,0]*non_self_mask[:,1]*non_self_mask[:,2]
+                neigh_v = neigh_v[neigh_mask*non_self_mask]
+                # neigh_v_size = neigh_v.size
+                if neigh_v.size == 2:
+                    disp = np.mod(neigh_v.ravel() - v + L/2,L) - L/2
+                    dist = np.sqrt(disp[0]**2 + disp[1]**2)
+                    direc = disp/dist
+                    direc_mat[j], dist_mat[j] = direc, dist
+                if neigh_v.size > 2:
+                    direc,dist = disp_from_min_dist(v,neigh_v,L)
+                    direc_mat[j],dist_mat[j] = direc,dist
+        if np.isnan(dist_mat).all():
+            direc = np.array((0.0,0.0))
+        else:
+            real_mask = ~np.isnan(dist_mat)
+            dist_mat = dist_mat[real_mask]
+            direc_mat = direc_mat[real_mask]
+            direc = direc_mat[np.argmin(dist_mat)]
+
+    else:
+        direc = np.array((0.0,0.0))
+    return direc
+#
+# @jit(nopython=True)
+# def disp_from_min_dist(x,X,L):
+#     nX = X.shape[0]
+#     nx = x.shape[0]
+#     dx,dy = np.outer(X[:,0],np.ones(nx)) - np.outer(np.ones(nX),x[:,0]),np.outer(X[:,1],np.ones(nx)) - np.outer(np.ones(nX),x[:,1])
+#     disp = np.column_stack((dx.ravel(),dy.ravel()))
+#     disp = np.mod(disp + L/2,L)-L/2
+#     dist = np.sqrt(disp[:,0]**2 + disp[:,1]**2)
+#     mindisti = np.argmin(dist)
+#     return disp[mindisti]/dist[mindisti]
+#
+# def get_dir_forward(self,i):
+#     tc_type = self.c_types[self.tris]
+#     i_tris = (self.tris==i).any(axis=1)
+#     two_type1_tris = (tc_type.sum(axis=1) == 2)*(~i_tris)
+#     neigh_vs = self.vs[two_type1_tris]
+#     cell_vs = self.vs[i_tris]
+#     return disp_from_min_dist(cell_vs,neigh_vs,self.L)
 
 
 def get_quartets(self):
@@ -31,6 +113,33 @@ def get_quartets(self):
     quartets = quartets[:k-1]
 
     return quartets
+
+
+
+def get_quartets_reverse(self):
+    ##Find typeB boundary cells (which will be flipped to type 0)
+    tc_type = self.c_types[self.tris]
+    two_type1_tris = tc_type.sum(axis=1) == 2
+    Ls = np.nonzero(two_type1_tris)[0]
+    Is,Js = np.nonzero(tc_type[two_type1_tris]==1)
+    type1_b_cells = self.tris[Ls[Is],Js]
+    quartets = []
+    ##2. For each, find tris where all are typeB. Then find those that have an opposite that is also type B
+    for type1_cell in type1_b_cells:
+        three_type1_tri_mask = ((tc_type.T*(self.tris == type1_cell).any(axis=1).T).sum(axis=0) == 3)
+        three_type1_tris = self.tris[three_type1_tri_mask]
+        js = np.nonzero(three_type1_tris == type1_cell)[1]
+        for tri_i,tri,j in zip(np.nonzero(three_type1_tri_mask)[0],three_type1_tris,js):
+            tri = np.roll(tri,-j)
+            opposite_tri = self.v_neighbours[tri_i,j]
+            if tri[0] not in self.tris[opposite_tri]:
+                opposite_cell = np.roll(self.tris[opposite_tri], -self.k2s[tri_i, j])[0]
+                if self.c_types[opposite_cell]==1:
+                    quartet = np.array((tri[0],opposite_cell,tri[1],tri[2]))
+                    # quartet = np.concatenate([[opposite_cell],tri])
+                    quartets.append(quartet)
+    return np.array(quartets)
+
 
 def get_thetas(self,quartet):
     disp = np.mod(self.x[quartet[1]] - self.x[quartet[0]]+self.L/2,self.L)-self.L/2
