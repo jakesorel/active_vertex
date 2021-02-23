@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import os
 import pandas as pd
 import seaborn as sb
+import multiprocessing
+from joblib import delayed,Parallel
 
 forward_files = os.listdir("energy_barrier/opt_v0/forward")
 reverse_files = os.listdir("energy_barrier/opt_v0/forward")
@@ -38,12 +40,50 @@ def update_df(df,beta_dict,lattice_dict):
 
 
 
+
 fig, ax = plt.subplots(1,2,sharey=True)
 for i, t1_type in enumerate(["forward","reverse"]):
     df = make_df(t1_type)
     df = update_df(df,beta_dict,lattice_dict)
-    mean_beta = [df.loc[df["beta"] == beta]["val"].mean() for beta in beta_range]
+    mean_beta = [np.median(df.loc[df["beta"] == beta]["val"].values) for beta in beta_range]
     ax[i].plot(beta_range,mean_beta)
     # sb.lineplot(data = df, x = "beta",y = "val",hue="lattice",ax = ax[i])
     ax[i].set(xscale="log")
 fig.show()
+
+
+
+####energy landscape
+_, RRR,CCI = np.meshgrid(beta_range, rep_range,rep_range, indexing="ij")
+n_t = 2000
+
+t1_type = "forward"
+dir_name = "energy_barrier/energies_mobile_i/%s"%t1_type
+def extract_energies(file):
+    try:
+        return np.load("%s/%s"%(dir_name,file))["arr_0"]
+    except:
+        return np.ones(n_t)*np.nan
+
+
+inputs = os.listdir(dir_name)
+num_cores = multiprocessing.cpu_count()
+out = Parallel(n_jobs=num_cores)(delayed(extract_energies)(inputt) for inputt in inputs)
+Id = [int(input.split("_")[0]) for input in inputs]
+li = [int(input.split("_")[1]) for input in inputs]
+cll_i = [int(input.split("_")[2].split(".npz")[0]) for input in inputs]
+t1_time = [int(float(np.loadtxt("energy_barrier/t1_time/%s/%d_%d_%d.txt"%(t1_type,Id[i],li[i],cll_i[i])))/0.025) for i in range(len(inputs))]
+E_a = [outt[t1_time[i]] - outt[0] for i, outt in enumerate(out)]
+
+df = pd.DataFrame({"Id":Id,"cll_i":cll_i,"E_a":E_a})
+df = update_df(df,beta_dict,lattice_dict)
+out_i = np.array(out)[np.where(np.array(cll_i)==0)[0]]
+fig, ax = plt.subplots()
+df = df.loc[df["cll_i"] == 0]
+sb.lineplot(data = df,x = "beta",y = "E_a",ax=ax)
+ax.set(xscale="log")
+fig.show()
+
+"""
+Another alternative strategy -- constant and high v0, measure energy barrier
+"""
