@@ -214,7 +214,7 @@ def interpolate_x(self,x_save,t1_time,t_eval_i,t_eval):
             x_save_fine[:,j,i] = x_save_sample[0,j,i]+fn(t_eval)
     return np.mod(x_save_fine,self.L)
 
-def get_energy(self,x,kappa_A,kappa_P,J,get_l_interface,):
+def get_energy(self,x,kappa_A,kappa_P,J,get_l_interface):
     self.x = x
     self._triangulate_periodic(x)
     self.assign_vertices()

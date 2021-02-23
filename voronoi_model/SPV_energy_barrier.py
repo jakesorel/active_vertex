@@ -17,7 +17,7 @@ p0 = 3.9
 r = 10
 vor.v0 = 1.6
 vor.Dr = 1e-1
-beta = 1e-1
+beta = 1e-3
 
 vor.kappa_A = 1
 vor.kappa_P = 1/r
@@ -35,7 +35,7 @@ vor.set_t_span(0.025, 300)
 vor.n_t = vor.t_span.size
 vor.no_movement_time = 50
 
-vor.initialize_t1(0,t1_type="forward")
+vor.initialize_t1(0,t1_type="reverse")
 
 vor.simulate_t1(equiangulate=True)
 vor.plot_scatter = False
@@ -48,6 +48,7 @@ fig, ax = plt.subplots(1,t_span_sample.size,figsize=(15,4))
 for i, ti in enumerate(t_span_sample):
     vor.plot_vor(vor.x_save[ti],ax=ax[i])
     ax[i].axis("off")
+fig.show()
 fig.savefig("plots/time_course_t1.pdf")
 
 

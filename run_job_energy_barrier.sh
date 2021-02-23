@@ -11,4 +11,5 @@
 
 source activate apical_domain
 
-python voronoi_model/SPV_energy_barrier_cluster.py "$1" "$2" "$3"
+#python voronoi_model/SPV_energy_barrier_cluster.py "$1" "$2" "$3"
+python voronoi_model/SPV_energy_barrier_get_energy.py "$1" "$2" "$3"
