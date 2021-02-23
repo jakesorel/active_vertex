@@ -72,7 +72,7 @@ def get_energy_sim(beta,Id,li,cll_i,t1_type="forward"):
                         energies)
     np.savez_compressed("energy_barrier/energies_mobile_i/%s/%d_%d_%d.npz" % (t1_type, Id, li, cll_i),
                         energies[:,vor.mobile_i])
-    np.savetxt("energy_barrier/mobile_i/%s/%d_%d_%d.txt"% (t1_type,Id, li,cll_i),vor.mobile_i)
+    np.savetxt("energy_barrier/mobile_i/%s/%d_%d_%d.txt"% (t1_type,Id, li,cll_i),[vor.mobile_i])
 
 if __name__ == "__main__":
     Id = int(sys.argv[1])
