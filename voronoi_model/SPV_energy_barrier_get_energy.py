@@ -78,14 +78,14 @@ if __name__ == "__main__":
     beta = BB.take(Id)
     li = RR.take(Id)
     for cll_i in range(12):
-        try:
-            get_energy_sim(beta, Id, cll_i, t1_type="forward")
-        except:
-            a = 1
-        try:
-            get_energy_sim(beta, Id, cll_i, t1_type="reverse")
-        except:
-            a = 1
+        # try:
+        get_energy_sim(beta, Id, cll_i, t1_type="forward")
+        # except:
+        #     a = 1
+        # try:
+        get_energy_sim(beta, Id, cll_i, t1_type="reverse")
+        # except:
+        #     a = 1
 
 
 
