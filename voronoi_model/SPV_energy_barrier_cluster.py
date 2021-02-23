@@ -110,6 +110,7 @@ def get_v0_opt(beta,li,Id,cll_i,t1_type="forward",n_iter = 5):
         if ~fs:
             i+=1
             v0_chosen += 0.01
+    print(fs)
     if fs is True:
         save_simulation(sim, li,Id, cll_i, t1_type)
         np.savetxt("energy_barrier/opt_v0/%s/%d_%d_%d.txt"% (t1_type,Id, li, cll_i),[v0_chosen])

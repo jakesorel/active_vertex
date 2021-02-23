@@ -7,9 +7,10 @@ def make_directory(dir_name):
 
 def get_energy(self, x, tris,kappa_A, kappa_P, J, get_l_interface):
     self.x = x
-    self.tris = tris
-    self.Cents = x[self.tris]
-    self.vs = self.get_vertex_periodic()
+    self._triangulate_periodic(self.x)
+    # self.tris = tris
+    # self.Cents = x[self.tris]
+    # self.vs = self.get_vertex_periodic()
     self.assign_vertices()
     A = self.get_A_periodic(self.neighbours, self.vs)
     P = self.get_P_periodic(self.neighbours, self.vs)
@@ -18,10 +19,12 @@ def get_energy(self, x, tris,kappa_A, kappa_P, J, get_l_interface):
     return energy
 
 
-def get_energy_sim(beta,Id,cll_i,t1_type="forward"):
+def get_energy_sim(beta,Id,li,cll_i,t1_type="forward"):
     dir_name = "energy_barrier"
 
     make_directory("energy_barrier/energies/%s"%t1_type)
+    make_directory("energy_barrier/energies_mobile_i/%s"%t1_type)
+
     make_directory("energy_barrier/mobile_i/%s"%t1_type)
     tri_save = np.load("energy_barrier/tri_save/%s/%d_%d_%d.npz" % (t1_type,Id, li, cll_i))["arr_0"]
     tri_save = tri_save.reshape(tri_save.shape[0], -1, 3)
@@ -32,11 +35,12 @@ def get_energy_sim(beta,Id,cll_i,t1_type="forward"):
     vor = Tissue()
     vor.generate_cells(600)
     vor.x = x_save[0]
-    vor._triangulate_periodic(vor.x)
     vor.x0 = vor.x
     vor.n_c = vor.x0.shape[0]
     vor.n_C = vor.n_c
     vor.L = 9
+    vor._triangulate_periodic(vor.x)
+
 
 
     p0 = 3.9
@@ -66,7 +70,9 @@ def get_energy_sim(beta,Id,cll_i,t1_type="forward"):
         energies[i] = get_energy(vor, x, tris,vor.kappa_A, vor.kappa_P, vor.J, get_l_interface)
     np.savez_compressed("energy_barrier/energies/%s/%d_%d_%d.npz" % (t1_type,Id, li,cll_i),
                         energies)
-    np.savetxt("energy_barrier/mobile_i/%s/%d_%d_%d.txt",vor.mobile_i)
+    np.savez_compressed("energy_barrier/energies_mobile_i/%s/%d_%d_%d.npz" % (t1_type, Id, li, cll_i),
+                        energies[:,vor.mobile_i])
+    np.savetxt("energy_barrier/mobile_i/%s/%d_%d_%d.txt"% (t1_type,Id, li,cll_i),vor.mobile_i)
 
 if __name__ == "__main__":
     Id = int(sys.argv[1])
@@ -79,11 +85,11 @@ if __name__ == "__main__":
     li = RR.take(Id)
     for cll_i in range(12):
         # try:
-        get_energy_sim(beta, Id, cll_i, t1_type="forward")
+        get_energy_sim(beta, Id, li,cll_i, t1_type="forward")
         # except:
         #     a = 1
         # try:
-        get_energy_sim(beta, Id, cll_i, t1_type="reverse")
+        get_energy_sim(beta, Id, li,cll_i, t1_type="reverse")
         # except:
         #     a = 1
 
