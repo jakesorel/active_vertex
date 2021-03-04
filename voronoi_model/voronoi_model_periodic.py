@@ -1144,12 +1144,29 @@ class Tissue:
             Ls = np.nonzero(two_type1_tris)[0]
             Is, Js = np.nonzero(tc_type[two_type1_tris] == 1)
             self.reverse_cells = np.unique(self.tris[Ls[Is], Js])
+            for i, cll in enumerate(self.reverse_cells):
+                neighs = np.unique(self.tris[np.nonzero(self.tris==cll)[0]])
+                n_a_neighs = (1-self.c_types[neighs]).sum()
+                if n_a_neighs!=2:
+                    self.reverse_cells[i] = -1
+
+            self.reverse_cells = self.reverse_cells[self.reverse_cells!=-1]
             self.n_t1_cells = self.reverse_cells.shape[0]
+            #
+            # tc_type = self.c_types[self.tris]
+            # two_type0_tris = tc_type.sum(axis=1) == 1
+            # Ls = np.nonzero(two_type0_tris)[0]
+            # Is, Js = np.nonzero(tc_type[two_type0_tris] == 0)
+            # self.reverse_cells = np.unique(self.tris[Ls[Is], Js])
+            # self.n_t1_cells = self.reverse_cells.shape[0]
+
+
 
         def initialize_t1(self,i,t1_type = "forward"):
             self.t1_type = t1_type
             self._triangulate_periodic(self.x)
             self.triangulate_periodic(self.x)
+            self.assign_vertices()
             if t1_type == "forward":
                 self.get_t1_forward_cells()
                 self.mobile_i = self.forward_cells[i]
@@ -1202,10 +1219,17 @@ class Tissue:
                 x += self.dt*(F + F_soft)
                 x += self.dt*(self.v0*0.01*self.noise[i])
                 if (t > self.no_movement_time):
-                    direc = get_mobile_dir(self.tris,self.c_types,self.v_neighbours,self.neighbours,self.L,self.vs,self.mobile_i,t1_type=self.t1_type)
-                    x[self.mobile_i] += self.dt*direc*self.v0
-                    if ((direc**2).sum() == 0)*(self.t1_time is False):
-                        self.t1_time = t
+                    tri_i,tri_k,complete = get_t1_dir(self.tris,self.c_types,self.v_neighbours,self.neighbours,self.L,self.vs,self.mobile_i,self.n_c,self.CV_matrix,t1_type=self.t1_type)
+                    if tri_i != -1:
+                        tri_j = self.v_neighbours[tri_i, tri_k]
+                        M_comp = np.zeros((self.n_c, 2))
+                        M_comp[self.tris[tri_i]] += get_M(tri_i, tri_j, self.vs, self.x, self.tris, self.L).T
+                        M_comp[self.tris[tri_j]] += get_M(tri_j, tri_i, self.vs, self.x, self.tris, self.L).T
+                        M_comp = (M_comp.T / np.linalg.norm(M_comp, axis=1)).T
+                        M_comp[np.isnan(M_comp)] = 0
+                        x += M_comp*self.dt*self.v0
+                        if complete * (self.t1_time is False):
+                            self.t1_time = t
                 x = np.mod(x,self.L)
                 self.x = x
                 self.x_save[i] = x
@@ -2509,10 +2533,200 @@ def disp_from_min_dist(x,X,L):
     mindisti = np.argmin(dist)
     mindist = dist[mindisti]
     return disp[mindisti]/mindist, mindist
+#
+#
+# @jit(nopython=True)
+# def get_mobile_dir(tris,c_types,v_neighbours,neighbours,L,vs,mobile_i,t1_type="forward"):
+#     """
+#     For a single A cell moving in (forward) or out (reverse) of the main A aggregate
+#
+#     Mobile_i must be of type "0" (A)
+#
+#     :param tris:
+#     :param mobile_i:
+#     :param t1_type:
+#     :return:
+#     """
+#     if t1_type == "forward":
+#         tot = 2
+#     if t1_type == "reverse":
+#         tot = 3
+#     m_tri_mask = (tris[:,0] == mobile_i)+(tris[:,1] == mobile_i)+(tris[:,2] == mobile_i)
+#     m_tris_i = np.arange(tris.shape[0])[m_tri_mask]
+#     direc_mat,dist_mat = np.ones((m_tris_i.size,2),dtype=np.float64)*np.nan,np.ones(m_tris_i.size,dtype=np.float64)*np.nan
+#     n_a_neighbours = np.sum(1 - c_types[tris[m_tris_i].ravel()].reshape(-1,3)) - m_tris_i.size ##not a real meausre, but a proxy for number of "A" type neighbours
+#     if (n_a_neighbours==0)*(t1_type == "forward") + (n_a_neighbours>0)*(t1_type=="reverse"):
+#     # if (n_a_neighbours<2)*(t1_type == "forward") + (n_a_neighbours>0)*(t1_type=="reverse"):
+#         ###small modification here such that minimally 2 A cell neighbours are required. Note the double counting required b.c. of the triangulation
+#         for j, i in enumerate(m_tris_i):
+#             tri = tris[i]
+#             v = vs[i]
+#             if c_types[tri].sum() ==2: #ensure the two neighbouring cells are of type "1" (B)
+#                 neigh_v = neighbours[i]
+#                 neighbour_tris = tris[v_neighbours[i]]
+#                 neigh_mask = c_types[neighbour_tris.ravel()].reshape(-1,3)
+#                 neigh_mask = (neigh_mask[:,0]+neigh_mask[:,1]+neigh_mask[:,2]) == tot
+#                 non_self_mask = neighbour_tris != mobile_i
+#                 non_self_mask = non_self_mask[:,0]*non_self_mask[:,1]*non_self_mask[:,2]
+#                 neigh_v = neigh_v[neigh_mask*non_self_mask]
+#                 # neigh_v_size = neigh_v.size
+#                 if neigh_v.size == 2:
+#                     disp = np.mod(neigh_v.ravel() - v + L/2,L) - L/2
+#                     dist = np.sqrt(disp[0]**2 + disp[1]**2)
+#                     direc = disp/dist
+#                     direc_mat[j], dist_mat[j] = direc, dist
+#                 if neigh_v.size > 2:
+#                     direc,dist = disp_from_min_dist(v,neigh_v,L)
+#                     direc_mat[j],dist_mat[j] = direc,dist
+#         if np.isnan(dist_mat).all():
+#             direc = np.array((0.0,0.0))
+#         else:
+#             real_mask = ~np.isnan(dist_mat)
+#             dist_mat = dist_mat[real_mask]
+#             direc_mat = direc_mat[real_mask]
+#             direc = direc_mat[np.argmin(dist_mat)]
+#
+#     else:
+#         direc = np.array((0.0,0.0))
+#     return direc
+
+
+#
+#
+# # @jit(nopython=True)
+# def get_mobile_dir(tris,c_types,v_neighbours,neighbours,L,vs,mobile_i,t1_type="forward"):
+#     """
+#     For a single A cell moving in (forward) or out (reverse) of the main A aggregate
+#
+#     Mobile_i must be of type "0" (A)
+#
+#     :param tris:
+#     :param mobile_i:
+#     :param t1_type:
+#     :return:
+#     """
+#     if t1_type == "forward":
+#         oc_type = 0
+#     if t1_type == "reverse":
+#         oc_type = 1
+#     m_tri_mask = (tris[:,0] == mobile_i)+(tris[:,1] == mobile_i)+(tris[:,2] == mobile_i)
+#     m_tris_i = np.arange(tris.shape[0])[m_tri_mask]
+#     direc_mat,dist_mat = np.ones((m_tris_i.size,2),dtype=np.float64)*np.nan,np.ones(m_tris_i.size,dtype=np.float64)*np.nan
+#     n_a_neighbours = np.sum(1 - c_types[tris[m_tris_i].ravel()].reshape(-1,3)) - m_tris_i.size ##not a real meausre, but a proxy for number of "A" type neighbours
+#     for j, i in enumerate(m_tris_i):
+#         tri = tris[i]
+#         v = vs[i]
+#         if c_types[tri].sum() ==2: #ensure the two neighbouring cells are of type "1" (B)
+#             neigh_v = neighbours[i]
+#             neighbour_tris = tris[v_neighbours[i]]
+#             opposite_mask = ~((neighbour_tris==tri[0])+(neighbour_tris==tri[1])+(neighbour_tris==tri[2]))
+#             opposite_cells = neighbour_tris.ravel()[opposite_mask.ravel()]
+#             oc_types = c_types[opposite_cells]
+#             neigh_v = neigh_v[oc_types == oc_type]
+#             if neigh_v.size == 2:
+#                 disp = np.mod(neigh_v.ravel() - v + L/2,L) - L/2
+#                 dist = np.sqrt(disp[0]**2 + disp[1]**2)
+#                 direc = disp/dist
+#                 direc_mat[j], dist_mat[j] = direc, dist
+#             if neigh_v.size > 2:
+#                 direc,dist = disp_from_min_dist(v,neigh_v,L)
+#                 direc_mat[j],dist_mat[j] = direc,dist
+#     if np.isnan(dist_mat).all():
+#         direc = np.array((0.0,0.0))
+#     else:
+#         real_mask = ~np.isnan(dist_mat)
+#         dist_mat = dist_mat[real_mask]
+#         direc_mat = direc_mat[real_mask]
+#         direc = direc_mat[np.argmin(dist_mat)]
+#
+#     return direc
+#
+#
+#
+# # @jit(nopython=True)
+# def get_t1_dir(tris,c_types,v_neighbours,neighbours,L,vs,mobile_i,t1_type="forward"):
+#     """
+#     For a single A cell moving in (forward) or out (reverse) of the main A aggregate
+#
+#     Mobile_i must be of type "0" (A)
+#
+#     :param tris:
+#     :param mobile_i:
+#     :param t1_type:
+#     :return:
+#     """
+#     if t1_type == "forward":
+#         corr_oc_type = 0
+#         nB1,nB2 = 1,2
+#     if t1_type == "reverse":
+#         corr_oc_type = 1
+#         nB1,nB2 = 2,1
+#
+#     m_tri_mask = (tris[:,0] == mobile_i)+(tris[:,1] == mobile_i)+(tris[:,2] == mobile_i)
+#     m_tris_i = np.arange(tris.shape[0])[m_tri_mask]
+#     adjacent_cells = np.unique(tris[m_tri_mask])
+#     # dist, direc, clls = np.inf,np.array((0.0,0.0)),np.array((0,1,2,3))
+#     dist, direc, clls,tri_i,tri_k = np.inf,np.array((0.0,0.0)),np.array((0,1,2,3)),-1,-1
+#
+#     for j, i in enumerate(m_tris_i):
+#         tri = tris[i]
+#         v = vs[i]
+#         if c_types[tri].sum() ==nB1: #ensure the two neighbouring cells are of type "1" (B)
+#             neigh_v = neighbours[i]
+#             neighbour_tris = tris[v_neighbours[i]]
+#             opposite_mask = ~((neighbour_tris==tri[0])+(neighbour_tris==tri[1])+(neighbour_tris==tri[2]))
+#             opposite_cells = neighbour_tris.ravel()[opposite_mask.ravel()]
+#             for k, o_c in enumerate(opposite_cells):
+#                 oc_type = c_types[o_c]
+#                 if (oc_type == corr_oc_type)*(o_c not in adjacent_cells):
+#                     disp_k = np.mod(neigh_v[k] - v + L / 2, L) - L / 2
+#                     dist_k = np.sqrt(disp_k[0] ** 2 + disp_k[1] ** 2)
+#                     if dist_k < dist:
+#                         dist = dist_k
+#                         direc = disp_k / dist_k
+#                         clls = np.roll(tri,-np.nonzero(tri==mobile_i)[0][0])
+#                         clls = np.append(clls,o_c)
+#                         tri_i = i
+#                         tri_k = k
+#     if np.isinf(dist):
+#         for j, i in enumerate(m_tris_i):
+#             tri = tris[i]
+#             v = vs[i]
+#             if c_types[tri].sum() ==nB2: #ensure the two neighbouring cells are of type "1" (B)
+#                 neigh_v = neighbours[i]
+#                 neighbour_tris = tris[v_neighbours[i]]
+#                 opposite_mask = ~((neighbour_tris==tri[0])+(neighbour_tris==tri[1])+(neighbour_tris==tri[2]))
+#                 opposite_cells = neighbour_tris.ravel()[opposite_mask.ravel()]
+#                 for k, o_c in enumerate(opposite_cells):
+#                     oc_type = c_types[o_c]
+#                     if (oc_type == corr_oc_type)*(o_c not in adjacent_cells):
+#                         disp_k = np.mod(neigh_v[k] - v + L / 2, L) - L / 2
+#                         dist_k = np.sqrt(disp_k[0] ** 2 + disp_k[1] ** 2)
+#                         if dist_k < dist:
+#                             dist = dist_k
+#                             direc = disp_k / dist_k
+#                             clls = np.roll(tri,-np.nonzero(tri==mobile_i)[0][0])
+#                             clls = np.append(clls,o_c)
+#                             tri_i = i
+#                             tri_k = k
+#     direc_cw = np.array((direc[1],-direc[0]))
+#     direcs = np.stack((direc,direc_cw,-direc_cw,-direc))
+#     return direcs,clls,tri_i,tri_k
+#
+#
 
 
 @jit(nopython=True)
-def get_mobile_dir(tris,c_types,v_neighbours,neighbours,L,vs,mobile_i,t1_type="forward"):
+def get_degree(c_types,tris,n_c,CV_matrix):
+    tri_types = c_types.ravel()[tris.ravel()].reshape(-1,3)
+    local_degree = (tri_types==roll_forward(tri_types))*1.0 + (tri_types==roll_reverse(tri_types))*1.0
+    degree = np.zeros(n_c)
+    for i in range(3):
+        degree += np.asfortranarray(CV_matrix[:,:,i])@np.asfortranarray(local_degree[:,i]/2)
+    return degree.astype(np.int64)
+
+# @jit(nopython=True)
+def get_t1_dir(tris,c_types,v_neighbours,neighbours,L,vs,mobile_i,n_c,CV_matrix,t1_type="forward"):
     """
     For a single A cell moving in (forward) or out (reverse) of the main A aggregate
 
@@ -2523,45 +2737,164 @@ def get_mobile_dir(tris,c_types,v_neighbours,neighbours,L,vs,mobile_i,t1_type="f
     :param t1_type:
     :return:
     """
-    if t1_type == "forward":
-        tot = 2
-    if t1_type == "reverse":
-        tot = 3
+
     m_tri_mask = (tris[:,0] == mobile_i)+(tris[:,1] == mobile_i)+(tris[:,2] == mobile_i)
     m_tris_i = np.arange(tris.shape[0])[m_tri_mask]
-    direc_mat,dist_mat = np.ones((m_tris_i.size,2),dtype=np.float64)*np.nan,np.ones(m_tris_i.size,dtype=np.float64)*np.nan
-    n_a_neighbours = np.sum(1 - c_types[tris[m_tris_i].ravel()].reshape(-1,3)) - m_tris_i.size ##not a real meausre, but a proxy for number of "A" type neighbours
-    if (n_a_neighbours==0)*(t1_type == "forward") + (n_a_neighbours>0)*(t1_type=="reverse"):
-    # if (n_a_neighbours<2)*(t1_type == "forward") + (n_a_neighbours>0)*(t1_type=="reverse"):
-        ###small modification here such that minimally 2 A cell neighbours are required. Note the double counting required b.c. of the triangulation
+    neighs = np.unique(tris[m_tris_i].ravel())
+    n_b_neighs = c_types[neighs].sum()
+    n_a_neighs = (1-c_types[neighs]).sum() - 1
+    tri_i, tri_k = -1,-1
+    mi_degree = np.nan
+    if (t1_type == "forward")*(n_a_neighs <2) + (t1_type=="reverse")*(n_a_neighs>0):
+        degree = get_degree(c_types,tris,n_c,CV_matrix)
+        mi_degree = degree[mobile_i]
+        quartets = np.zeros((m_tris_i.size,3,4),dtype=np.int64)
+        quartet_types = np.zeros((m_tris_i.size,3,4),dtype=np.int64)
+        quartet_degree = np.zeros((m_tris_i.size,3,4),dtype=np.int64)
+
         for j, i in enumerate(m_tris_i):
             tri = tris[i]
-            v = vs[i]
-            if c_types[tri].sum() ==2: #ensure the two neighbouring cells are of type "1" (B)
-                neigh_v = neighbours[i]
-                neighbour_tris = tris[v_neighbours[i]]
-                neigh_mask = c_types[neighbour_tris.ravel()].reshape(-1,3)
-                neigh_mask = (neigh_mask[:,0]+neigh_mask[:,1]+neigh_mask[:,2]) == tot
-                non_self_mask = neighbour_tris != mobile_i
-                non_self_mask = non_self_mask[:,0]*non_self_mask[:,1]*non_self_mask[:,2]
-                neigh_v = neigh_v[neigh_mask*non_self_mask]
-                # neigh_v_size = neigh_v.size
-                if neigh_v.size == 2:
-                    disp = np.mod(neigh_v.ravel() - v + L/2,L) - L/2
-                    dist = np.sqrt(disp[0]**2 + disp[1]**2)
-                    direc = disp/dist
-                    direc_mat[j], dist_mat[j] = direc, dist
-                if neigh_v.size > 2:
-                    direc,dist = disp_from_min_dist(v,neigh_v,L)
-                    direc_mat[j],dist_mat[j] = direc,dist
-        if np.isnan(dist_mat).all():
-            direc = np.array((0.0,0.0))
-        else:
-            real_mask = ~np.isnan(dist_mat)
-            dist_mat = dist_mat[real_mask]
-            direc_mat = direc_mat[real_mask]
-            direc = direc_mat[np.argmin(dist_mat)]
+            tri_types = c_types[tri]
+            tri_degree = degree[tri]
+            neighs_i = v_neighbours[i]
+            neighbour_tris = tris[neighs_i]
+            opposite_mask = ~((neighbour_tris==tri[0])+(neighbour_tris==tri[1])+(neighbour_tris==tri[2]))
+            opposite_cells = neighbour_tris.ravel()[opposite_mask.ravel()]
+            o_c_types = c_types[opposite_cells]
+            o_c_degree = degree[opposite_cells]
+            for k in range(3):
+                quartets[j,k,:3] = np.roll(tri,-k)
+                quartets[j,k,3] = opposite_cells[k]
+                quartet_types[j, k, :3] = np.roll(tri_types, -k)
+                quartet_types[j, k, 3] = o_c_types[k]
+                quartet_degree[j, k, :3] = np.roll(tri_degree, -k)
+                quartet_degree[j, k, 3] = o_c_degree[k]
 
-    else:
-        direc = np.array((0.0,0.0))
-    return direc
+        confs =  np.array(((1,1,0,1),(1,0,1,1),(0,1,1,1),(1,0,0,1)))
+        changes = np.array(((1,0,0,1),(1,0,0,1),(0,-1,-1,0),(1,-1,-1,1)))
+
+        t_changes = np.zeros_like(quartet_types)
+        for conf,change in zip(confs,changes):
+            mask =((quartet_types == conf).all(axis=2)+(quartet_types == (1-conf)).all(axis=2))
+            # mask = mask[:,:,0] * mask[:,:,1] * mask[:,:,2] * mask[:,:,3]
+            for i in range(4):
+                t_changes[:,:,i] += mask * change[i]
+        new_degree = t_changes + quartet_degree
+
+
+        if t1_type == "forward":
+            new_degree_not_0 = (new_degree != 0)
+            new_degree_not_0 = new_degree_not_0[:,:,0]*new_degree_not_0[:,:,1]*new_degree_not_0[:,:,2]*new_degree_not_0[:,:,3]
+            mobile_i_increase = t_changes.ravel()[(quartets == mobile_i).ravel()] * (new_degree_not_0.ravel())
+            max_mi_increase_mask = mobile_i_increase == mobile_i_increase.max()
+            pos = np.nonzero(max_mi_increase_mask)[0]
+            dist = np.inf
+            if pos.size!=0:
+                tri_is,tri_ks = m_tris_i[(pos/3).astype(np.int64)],pos%3
+                for tri_i_,tri_k_ in zip(tri_is,tri_ks):
+                    v = vs[tri_i]
+                    neigh_v = neighbours[tri_i,tri_k]
+                    disp = np.mod(v - neigh_v+L/2,L)-L/2
+                    dist_ = np.sqrt(disp[0]**2 + disp[1]**2)
+                    if dist_ < dist:
+                        tri_i,tri_k = tri_i_,tri_k_
+                        dist = dist_
+
+
+        if t1_type == "reverse":
+            mobile_i_increase = t_changes.ravel()[(quartets == mobile_i).ravel()]
+            min_mi_increase_mask = mobile_i_increase == mobile_i_increase.min()
+            pos = np.nonzero(min_mi_increase_mask)[0]
+            dist = np.inf
+            if pos.size!=0:
+                tri_is,tri_ks = m_tris_i[(pos/3).astype(np.int64)],pos%3
+                for tri_i_,tri_k_ in zip(tri_is,tri_ks):
+                    v = vs[tri_i]
+                    neigh_v = neighbours[tri_i,tri_k]
+                    disp = np.mod(v - neigh_v+L/2,L)-L/2
+                    dist_ = np.sqrt(disp[0]**2 + disp[1]**2)
+                    if dist_ < dist:
+                        tri_i,tri_k = tri_i_,tri_k_
+                        dist = dist_
+
+    complete = False
+    if t1_type == "forward":
+        if tri_i !=-1:
+            complete = True
+        if mi_degree > 0:
+            complete = True
+    if t1_type == "reverse":
+        if tri_i !=-1:
+            complete = True
+        if mi_degree == 0:
+            complete = True
+
+    return tri_i,tri_k,complete
+
+
+
+@jit(nopython=True,cache=True)
+def dhdr_periodic_single(rijk_,v,L):
+    """
+    Same as **dhdr** apart from accounts for periodic triangulation.
+
+    Calculates ∂h_j/dr_i the Jacobian for all cells in each triangulation
+
+    Last two dims: ((dhx/drx,dhx/dry),(dhy/drx,dhy/dry))
+
+    These are lifted from Mathematica
+
+    :param rijk_: (n_v x 3 x 2) np.float32 array of cell centroid positions for each cell in each triangulation (first two dims follow order of triangulation)
+    :param vs: (n_v x 2) np.float32 array of vertex positions, corresponding to each triangle in the triangulation
+    :param L: Domain size (np.float32)
+    :return: Jacobian for each cell of each triangulation (n_v x 3 x 2 x 2) np.float32 array (where the first 2 dims follow the order of the triangulation.
+    """
+    rijk = np.empty_like(rijk_)
+    for i in range(3):
+        rijk[i] = np.remainder(rijk_[i] - v + L/2,L) - L/2
+
+    DHDR = np.empty(rijk.shape + (2,))
+    for i in range(3):
+        ax,ay = rijk[np.mod(i,3),0],rijk[np.mod(i,3),1]
+        bx, by = rijk[np.mod(i+1,3), 0], rijk[np.mod(i+1,3), 1]
+        cx, cy = rijk[np.mod(i+2,3), 0], rijk[np.mod(i+2,3), 1]
+        #dhx/drx
+        DHDR[i, 0, 0] = (ax * (by - cy)) / ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy)) - ((by - cy) * (
+                (ax ** 2 + ay ** 2) * (by - cy) + (bx ** 2 + by ** 2) * (-ay + cy) + (ay - by) * (
+                cx ** 2 + cy ** 2))) / (2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy)) ** 2)
+
+        #dhy/drx
+        DHDR[i, 0,1] = (bx ** 2 + by ** 2 - cx ** 2 + 2 * ax * (-bx + cx) - cy ** 2) / (
+                    2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy))) - ((by - cy) * (
+                    (bx ** 2 + by ** 2) * (ax - cx) + (ax ** 2 + ay ** 2) * (-bx + cx) + (-ax + bx) * (
+                        cx ** 2 + cy ** 2))) / (2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy)) ** 2)
+
+        #dhx/dry
+        DHDR[i, 1, 0] = (-bx ** 2 - by ** 2 + cx ** 2 + 2 * ay * (by - cy) + cy ** 2) / (
+                2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy))) - ((-bx + cx) * (
+                (ax ** 2 + ay ** 2) * (by - cy) + (bx ** 2 + by ** 2) * (-ay + cy) + (ay - by) * (
+                cx ** 2 + cy ** 2))) / (2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy)) ** 2)
+
+        #dhy/dry
+        DHDR[i, 1,1] = (ay * (-bx + cx)) / ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy)) - ((-bx + cx) * (
+                    (bx ** 2 + by ** 2) * (ax - cx) + (ax ** 2 + ay ** 2) * (-bx + cx) + (-ax + bx) * (
+                        cx ** 2 + cy ** 2))) / (2. * ((ay - by) * cx + ax * (by - cy) + bx * (-ay + cy)) ** 2)
+
+
+    return DHDR
+
+
+
+def get_M(tri_i,tri_j,vs,x,tris,L):
+    v = vs[tri_i]
+    neigh_v = vs[tri_j]
+    direc = neigh_v - v
+    direc /= np.linalg.norm(direc)
+    DHDR = dhdr_periodic_single(x[tris[tri_i]],v,L)
+    M = np.zeros((2, 2, 3))
+    for i in range(3):
+        for j in range(3):
+            for Fdim in range(2):
+                M[:, Fdim, i] += DHDR[i, Fdim] * direc
+    M = M[0] + M[1]
+    return M
