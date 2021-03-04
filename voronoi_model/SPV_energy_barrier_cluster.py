@@ -1,4 +1,4 @@
-from voronoi_model_periodic import *
+from voronoi_model.voronoi_model_periodic import *
 import sys
 
 def make_directory(dir_name):
@@ -146,14 +146,19 @@ def get_v0_opt(beta,li,Id,cll_i,t1_type="forward",n_iter = 5):
     while (i<11)*(fs==False):
         sim = run_simulation(beta, v0_chosen, Id, cll_i, t1_type)
         fs = (sim.t1_time !=False)
-        # n_islands = np.array(sim.get_num_islands(2)).sum(axis=0)[-1]
-        # if (t1_type == "forward")*(n_islands==2)+(t1_type=="reverse")*(n_islands==3):
-        #     fs = True
         if fs==False:
             i+=1
             v0_chosen += 0.01
+    v0_chosen = v0_chosen - 0.009
+    i = 0
+    while (i<11)*(fs==False):
+        sim = run_simulation(beta, v0_chosen, Id, cll_i, t1_type)
+        fs = (sim.t1_time !=False)
+        if fs==False:
+            i+=1
+            v0_chosen += 0.001
     # return v0_chosen,sim
-    if fs is True:
+    if fs == True:
         save_simulation(sim, li,Id, cll_i, t1_type)
         np.savetxt("energy_barrier/opt_v0/%s/%d_%d_%d.txt"% (t1_type,Id, li, cll_i),[v0_chosen])
 

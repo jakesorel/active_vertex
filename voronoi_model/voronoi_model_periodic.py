@@ -2819,12 +2819,12 @@ def get_t1_dir(tris,c_types,v_neighbours,neighbours,L,vs,mobile_i,n_c,CV_matrix,
 
     complete = False
     if t1_type == "forward":
-        if tri_i !=-1:
+        if tri_i ==-1:
             complete = True
         if mi_degree > 0:
             complete = True
     if t1_type == "reverse":
-        if tri_i !=-1:
+        if tri_i ==-1:
             complete = True
         if mi_degree == 0:
             complete = True

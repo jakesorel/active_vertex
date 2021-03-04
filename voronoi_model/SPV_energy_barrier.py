@@ -15,9 +15,9 @@ vor.L = 9
 
 p0 = 3.9
 r = 10
-vor.v0 = 0.2
+vor.v0 = 0.001
 vor.Dr = 1e-1
-beta = 1e-1
+beta = 1e-3
 
 vor.kappa_A = 1
 vor.kappa_P = 1/r
@@ -31,11 +31,11 @@ c_types = np.zeros(vor.n_c, dtype=np.int64)
 c_types[~A_mask] = 1
 vor.set_interaction(W = beta*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
 
-vor.set_t_span(0.025, 100)
+vor.set_t_span(0.025, 50)
 vor.n_t = vor.t_span.size
-vor.no_movement_time = 30
+vor.no_movement_time = 10
 
-vor.initialize_t1(0,t1_type="reverse")
+vor.initialize_t1(0,t1_type="forward")
 
 self = vor
 self.assign_vertices()
