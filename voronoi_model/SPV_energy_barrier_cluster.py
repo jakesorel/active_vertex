@@ -1,4 +1,4 @@
-from voronoi_model.voronoi_model_periodic import *
+from voronoi_model_periodic import *
 import sys
 
 def make_directory(dir_name):
