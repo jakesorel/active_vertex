@@ -1,4 +1,4 @@
-from voronoi_model_periodic import *
+from voronoi_model.voronoi_model_periodic import *
 import sys
 
 def make_directory(dir_name):
@@ -149,7 +149,10 @@ def get_v0_opt(beta,li,Id,cll_i,t1_type="forward",n_iter = 5):
         if fs==False:
             i+=1
             v0_chosen += 0.01
+            print(v0_chosen)
+    fs = False
     v0_chosen = v0_chosen - 0.009
+    print(v0_chosen)
     i = 0
     while (i<11)*(fs==False):
         sim = run_simulation(beta, v0_chosen, Id, cll_i, t1_type)
@@ -157,6 +160,7 @@ def get_v0_opt(beta,li,Id,cll_i,t1_type="forward",n_iter = 5):
         if fs==False:
             i+=1
             v0_chosen += 0.001
+            print(v0_chosen)
     # return v0_chosen,sim
     if fs == True:
         save_simulation(sim, li,Id, cll_i, t1_type)
@@ -197,7 +201,7 @@ if __name__ == "__main__":
     make_directory("energy_barrier/t1_time/reverse")
 
     n_t1_f = get_n_t1_cells(beta, 0, Id, 0, t1_type="forward")
-    n_t1_r = get_n_t1_cells(beta, 0, Id, 0, t1_type="forward")
+    n_t1_r = get_n_t1_cells(beta, 0, Id, 0, t1_type="reverse")
 
     for cll_i in range(n_t1_f):
         get_v0_opt(beta, li,Id, cll_i, t1_type="forward")

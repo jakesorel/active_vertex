@@ -5,6 +5,43 @@ def make_directory(dir_name):
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
 
+
+def get_n_t1_cells(beta,v0,Id,cll_i,t1_type="forward"):
+    dir_name = "sorted_lattices"
+    x = np.loadtxt("%s/x_%d.txt"%(dir_name,Id))
+    c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,Id)).astype(np.int64)
+    vor = Tissue()
+    vor.generate_cells(600)
+    vor.x = x
+    vor.x0 = vor.x
+    vor.n_c = vor.x0.shape[0]
+    vor.n_C = vor.n_c
+    vor.L = 9
+
+
+    p0 = 3.9
+    r = 10
+    vor.v0 = v0
+    vor.Dr = 1e-1
+    beta = beta
+
+    vor.kappa_A = 1
+    vor.kappa_P = 1/r
+    vor.A0 = 1
+    vor.P0 = p0
+    vor.a = 0.3
+    vor.k = 0
+
+    vor.set_interaction(W = beta*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
+
+    vor.set_t_span(0.025, 50)
+    vor.n_t = vor.t_span.size
+    vor.no_movement_time = 10
+
+    vor.initialize_t1(cll_i,t1_type=t1_type)
+    return vor.n_t1_cells
+
+
 def get_energy(self, x, tris,kappa_A, kappa_P, J, get_l_interface):
     self.x = x
     self._triangulate_periodic(self.x)
@@ -83,9 +120,15 @@ if __name__ == "__main__":
     BB,RR = np.meshgrid(beta_range,rep_range,indexing="ij")
     beta = BB.take(Id)
     li = RR.take(Id)
-    for cll_i in range(12):
+
+    n_t1_f = get_n_t1_cells(beta, 0, Id, 0, t1_type="forward")
+    n_t1_r = get_n_t1_cells(beta, 0, Id, 0, t1_type="reverse")
+
+
+    for cll_i in range(n_t1_f):
         get_energy_sim(beta, Id, li,cll_i, t1_type="reverse")
         print(Id,cll_i,"reverse")
+    for cll_i in range(n_t1_r):
         get_energy_sim(beta, Id, li,cll_i, t1_type="forward")
         print(Id,cll_i,"forward")
 

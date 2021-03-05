@@ -1228,8 +1228,8 @@ class Tissue:
                         M_comp = (M_comp.T / np.linalg.norm(M_comp, axis=1)).T
                         M_comp[np.isnan(M_comp)] = 0
                         x += M_comp*self.dt*self.v0
-                        if complete * (self.t1_time is False):
-                            self.t1_time = t
+                    if complete * (self.t1_time is False):
+                        self.t1_time = t
                 x = np.mod(x,self.L)
                 self.x = x
                 self.x_save[i] = x

@@ -15,9 +15,9 @@ vor.L = 9
 
 p0 = 3.9
 r = 10
-vor.v0 = 0.001
+vor.v0 = 0.1
 vor.Dr = 1e-1
-beta = 1e-3
+beta = 0.001
 
 vor.kappa_A = 1
 vor.kappa_P = 1/r
@@ -35,7 +35,7 @@ vor.set_t_span(0.025, 50)
 vor.n_t = vor.t_span.size
 vor.no_movement_time = 10
 
-vor.initialize_t1(0,t1_type="forward")
+vor.initialize_t1(0,t1_type="reverse")
 
 self = vor
 self.assign_vertices()
