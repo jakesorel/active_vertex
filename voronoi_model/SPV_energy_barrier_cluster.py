@@ -130,7 +130,7 @@ def get_v0_opt(beta,li,Id,cll_i,t1_type="forward",n_iter = 5):
     v0_chosen = 0.1
     i = 0
     v0_range = np.arange(0.1,5,0.1)
-    n_max = v0_range.size
+    n_max = v0_range.size-1
     while (i<n_max)*(fs==False):
         sim = run_simulation(beta, v0_range[i], Id, cll_i, t1_type)
         fs = (sim.t1_time !=False)
