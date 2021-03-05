@@ -204,7 +204,12 @@ if __name__ == "__main__":
     n_t1_r = get_n_t1_cells(beta, 0, Id, 0, t1_type="reverse")
 
     for cll_i in range(n_t1_f):
-        get_v0_opt(beta, li,Id, cll_i, t1_type="forward")
+        try:
+            get_v0_opt(beta, li,Id, cll_i, t1_type="forward")
+        except:
+            a = 1
     for cll_i in range(n_t1_r):
-        get_v0_opt(beta, li, Id, cll_i, t1_type="reverse")
-
+        try:
+            get_v0_opt(beta, li, Id, cll_i, t1_type="reverse")
+        except:
+            a=1
