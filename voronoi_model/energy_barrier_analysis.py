@@ -42,15 +42,16 @@ def update_df(df,beta_dict,lattice_dict):
 
 
 fig, ax = plt.subplots(1,2,sharey=True)
-for i, t1_type in enumerate(["forward"]):
+for i, t1_type in enumerate(["forward","reverse"]):
     df = make_df(t1_type)
     df = update_df(df,beta_dict,lattice_dict)
+    df["val"] = np.log10(df["val"])
     mean_beta = [np.median(df.loc[df["beta"] == beta]["val"].values) for beta in beta_range]
     # ax[i].plot(beta_range,mean_beta)
     # ax[i].scatter(df["beta"],df["val"])
     sb.boxplot(data = df, x = "beta",y = "val",ax = ax[i])
     # ax[i].set(xscale="log")
-    ax[i].set(yscale="log")
+    # ax[i].set(yscale="log")
 fig.show()
 
 
@@ -60,7 +61,7 @@ _, RRR,CCI = np.meshgrid(beta_range, rep_range,rep_range, indexing="ij")
 n_t = 2000
 
 t1_type = "forward"
-dir_name = "energy_barrier_old/energies_mobile_i/%s"%t1_type
+dir_name = "energy_barrier/energies_mobile_i/%s"%t1_type
 def extract_energies(file):
     try:
         return np.load("%s/%s"%(dir_name,file))["arr_0"]

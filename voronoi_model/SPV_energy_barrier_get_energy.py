@@ -125,10 +125,10 @@ if __name__ == "__main__":
     n_t1_r = get_n_t1_cells(beta, 0, Id, 0, t1_type="reverse")
 
 
-    for cll_i in range(n_t1_f):
+    for cll_i in range(n_t1_r):
         get_energy_sim(beta, Id, li,cll_i, t1_type="reverse")
         print(Id,cll_i,"reverse")
-    for cll_i in range(n_t1_r):
+    for cll_i in range(n_t1_f):
         get_energy_sim(beta, Id, li,cll_i, t1_type="forward")
         print(Id,cll_i,"forward")
 
