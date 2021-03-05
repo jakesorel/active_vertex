@@ -126,11 +126,17 @@ if __name__ == "__main__":
 
 
     for cll_i in range(n_t1_r):
-        get_energy_sim(beta, Id, li,cll_i, t1_type="reverse")
-        print(Id,cll_i,"reverse")
+        try:
+            get_energy_sim(beta, Id, li,cll_i, t1_type="reverse")
+            print(Id,cll_i,"reverse")
+        except:
+            a = a
     for cll_i in range(n_t1_f):
-        get_energy_sim(beta, Id, li,cll_i, t1_type="forward")
-        print(Id,cll_i,"forward")
+        try:
+            get_energy_sim(beta, Id, li,cll_i, t1_type="forward")
+            print(Id,cll_i,"forward")
+        except:
+            a = a
 
 
 
