@@ -2,14 +2,14 @@
 
 #Submit this script with: sbatch thefilename
 
-#SBATCH --time=3:00:00   # walltime
+#SBATCH --time=5:00:00   # walltime
 #SBATCH --ntasks=1   # number of processor cores (i.e. tasks)
 #SBATCH -J "active_vertex"   # job name
-#SBATCH --output=output_fromsorted.out
-#SBATCH --error=output_fromsorted.out
+#SBATCH --output=output_energy_barrier.out
+#SBATCH --error=output_energy_barrier.out
 
 
 source activate apical_domain
 
-#python voronoi_model/SPV_energy_barrier_cluster.py "$1" "$2" "$3"
+python voronoi_model/SPV_energy_barrier_cluster.py "$1" "$2" "$3"
 python voronoi_model/SPV_energy_barrier_get_energy.py "$1" "$2" "$3"

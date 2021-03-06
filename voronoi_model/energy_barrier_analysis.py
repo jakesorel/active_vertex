@@ -73,23 +73,24 @@ fig.show()
 _, RRR,CCI = np.meshgrid(beta_range, rep_range,rep_range, indexing="ij")
 n_t = 2000
 
-t1_type = "forward"
-dir_name = "energy_barrier/energies_mobile_i/%s"%t1_type
+
 def extract_energies(file):
     try:
         return np.load("%s/%s"%(dir_name,file))["arr_0"]
     except:
         return np.ones(n_t)*np.nan
 
-
+t1_type = "reverse"
+dir_name = "energy_barrier/energies_tot/%s"%t1_type
 inputs = os.listdir(dir_name)
 num_cores = multiprocessing.cpu_count()
 out = Parallel(n_jobs=num_cores)(delayed(extract_energies)(inputt) for inputt in inputs)
 Id = [int(input.split("_")[0]) for input in inputs]
 li = [int(input.split("_")[1]) for input in inputs]
 cll_i = [int(input.split("_")[2].split(".npz")[0]) for input in inputs]
-t1_time = [int(float(np.loadtxt("energy_barrier_old/t1_time/%s/%d_%d_%d.txt"%(t1_type,Id[i],li[i],cll_i[i])))/0.025) for i in range(len(inputs))]
-E_a = [outt[t1_time[i]] - outt[0] for i, outt in enumerate(out)]
+t1_time = [int(float(np.loadtxt("energy_barrier/t1_time/%s/%d_%d_%d.txt"%(t1_type,Id[i],li[i],cll_i[i])))/0.025) for i in range(len(inputs))]
+# E_a = [outt[t1_time[i]] - outt[0] for i, outt in enumerate(out)]
+E_a = [outt.max() - outt[0] for i, outt in enumerate(out)]
 
 df = pd.DataFrame({"Id":Id,"cll_i":cll_i,"E_a":E_a})
 df = update_df(df,beta_dict,lattice_dict)
@@ -100,6 +101,82 @@ sb.lineplot(data = df,x = "beta",y = "E_a",ax=ax)
 ax.set(xscale="log")
 fig.show()
 
-"""
-Another alternative strategy -- constant and high v0, measure energy barrier
-"""
+
+def plot_E_a(ax,t1_type="forward",col="red",label="Sorting",scale="linear"):
+    # t1_type = "reverse"
+    dir_name = "energy_barrier/energies_tot/%s" % t1_type
+    inputs = os.listdir(dir_name)
+    num_cores = multiprocessing.cpu_count()
+    out = Parallel(n_jobs=num_cores)(delayed(extract_energies)(inputt) for inputt in inputs)
+    Id = [int(input.split("_")[0]) for input in inputs]
+    li = [int(input.split("_")[1]) for input in inputs]
+    cll_i = [int(input.split("_")[2].split(".npz")[0]) for input in inputs]
+    t1_time = [
+        int(float(np.loadtxt("energy_barrier/t1_time/%s/%d_%d_%d.txt" % (t1_type, Id[i], li[i], cll_i[i]))) / 0.025) for
+        i in range(len(inputs))]
+
+
+    df2 = pd.DataFrame({"Id":Id,"cll_i":cll_i,"E":out})
+    df2 = update_df(df2,beta_dict,lattice_dict)
+    df2["dE"] = [vals[:-1] - vals[1:] for vals in df2["E"]]
+    df2["max dE"] = [np.max(np.abs(val)) for val in df2["dE"]]
+    df2["mask"] = [val<0.05 for val in df2["max dE"]]
+    df2["t1_time"] = t1_time
+    df2["Ea"] = [val[t1_time] - val[400] if mask else np.nan for mask, val, t1_time in zip(df2["mask"],df2["E"],df2["t1_time"])]
+    df2["log beta"] = np.log10(df2["beta"])
+    df2["log Ea"] = np.log10(df2["Ea"])
+    if scale == "linear":
+        sb.lineplot(data=df2, x="beta", y="Ea", ax=ax, color=col, label=label)
+        ax.set(xlabel=r"$\beta$",ylabel=r"$E_a$")
+    if scale == "log":
+        sb.lineplot(data = df2,x="log beta",y="log Ea",ax=ax,color=col,label=label)
+        ax.set(xlabel=r"$log_{10} \ \beta$",ylabel=r"$log_{10} \ E_a$")
+
+def make_real_t1_fig(scale="linear"):
+    fig, ax = plt.subplots(figsize=(3.5,2.5))
+    plot_E_a(ax,"forward",plt.cm.inferno(0.2),"Sorting",scale)
+    plot_E_a(ax,"reverse",plt.cm.inferno(0.8),"Unsorting",scale)
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.6)
+    fig.savefig("paper_plots/Fig3/real_t1s_%s.pdf"%scale,dpi=300)
+
+make_real_t1_fig("linear")
+make_real_t1_fig("log")
+
+
+def plot_energy(ax,t1_type="forward"):
+    t1_type = "forward"
+    dir_name = "energy_barrier/energies_tot/%s" % t1_type
+    inputs = os.listdir(dir_name)
+    num_cores = multiprocessing.cpu_count()
+    out = Parallel(n_jobs=num_cores)(delayed(extract_energies)(inputt) for inputt in inputs)
+    Id = [int(input.split("_")[0]) for input in inputs]
+    li = [int(input.split("_")[1]) for input in inputs]
+    cll_i = [int(input.split("_")[2].split(".npz")[0]) for input in inputs]
+    t1_time = [
+        int(float(np.loadtxt("energy_barrier/t1_time/%s/%d_%d_%d.txt" % (t1_type, Id[i], li[i], cll_i[i]))) / 0.025) for
+        i in range(len(inputs))]
+
+
+    df2 = pd.DataFrame({"Id":Id,"cll_i":cll_i,"E":out})
+    df2 = update_df(df2,beta_dict,lattice_dict)
+    df2["dE"] = [vals[:-1] - vals[1:] for vals in df2["E"]]
+    df2["max dE"] = [np.max(np.abs(val)) for val in df2["dE"]]
+    df2["mask"] = [val<0.05 for val in df2["max dE"]]
+    df2["t1_time"] = t1_time
+    fig, ax = plt.subplots()
+    cols = plt.cm.plasma(np.linspace(0,1,12))
+    for j, beta in enumerate(beta_range):
+        # beta = beta_range[0]
+        n_sample = (df2["beta"] == beta).sum()
+        E_mat = np.ones((n_sample,2*n_t))*np.nan
+        df_sample = df2.loc[df2["beta"] == beta]
+        for i, (E,t1_time,mask) in enumerate(zip(df_sample["E"],df_sample["t1_time"],df_sample["mask"])):
+            if mask:
+                E_mat[i,n_t-t1_time+400:2*n_t-t1_time] = E[400:] - E[400]
+        ax.plot(np.nanmean(E_mat,axis=0)[:n_t+100],color=cols[j])
+    # ax.plot((2000,2000),(0.054,0.059),color="k")
+    ax.set(xlabel="Time",ylabel="E - E_0")
+    fig.show()

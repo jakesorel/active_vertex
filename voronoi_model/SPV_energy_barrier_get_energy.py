@@ -96,7 +96,7 @@ def get_energy_sim(beta,Id,li,cll_i,t1_type="forward"):
 
     vor.set_interaction(W = beta*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
 
-    vor.set_t_span(0.025, 50)
+    vor.set_t_span(0.025, 100)
     vor.n_t = vor.t_span.size
 
     vor.c_types = c_types
