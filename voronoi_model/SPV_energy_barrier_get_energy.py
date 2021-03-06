@@ -61,6 +61,7 @@ def get_energy_sim(beta,Id,li,cll_i,t1_type="forward"):
 
     make_directory("energy_barrier/energies/%s"%t1_type)
     make_directory("energy_barrier/energies_mobile_i/%s"%t1_type)
+    make_directory("energy_barrier/energies_tot/%s"%t1_type)
 
     make_directory("energy_barrier/mobile_i/%s"%t1_type)
     tri_save = np.load("energy_barrier/tri_save/%s/%d_%d_%d.npz" % (t1_type,Id, li, cll_i))["arr_0"]
@@ -107,6 +108,7 @@ def get_energy_sim(beta,Id,li,cll_i,t1_type="forward"):
         energies[i] = get_energy(vor, x, tris,vor.kappa_A, vor.kappa_P, vor.J, get_l_interface)
     np.savez_compressed("energy_barrier/energies/%s/%d_%d_%d.npz" % (t1_type,Id, li,cll_i),
                         energies)
+    np.savez_compressed("energy_barrier/energies_tot/%s/%d_%d_%d.npz" % (t1_type,Id, li,cll_i),energies.sum(axis=1))
     np.savez_compressed("energy_barrier/energies_mobile_i/%s/%d_%d_%d.npz" % (t1_type, Id, li, cll_i),
                         energies[:,vor.mobile_i])
     np.savetxt("energy_barrier/mobile_i/%s/%d_%d_%d.txt"% (t1_type,Id, li,cll_i),[vor.mobile_i])
