@@ -46,22 +46,25 @@ def remove_2nd(df,beta_range):
     return pd.concat(dfs)
 
 
-fig, ax = plt.subplots(1,2,sharey=True)
+fig, ax = plt.subplots(figsize=(4,4))
 for i, t1_type in enumerate(["forward","reverse"]):
     df = make_df(t1_type)
     df = update_df(df,beta_dict,lattice_dict)
-    df = remove_2nd(df,beta_range)
+    # df = remove_2nd(df,beta_range)
     df["val"] = np.log10(df["val"])
-    mean_beta = [np.median(df.loc[df["beta"] == beta]["val"].values) for beta in beta_range[::2]]
-    LQ_beta = [np.percentile(df.loc[df["beta"] == beta]["val"].values,25) for beta in beta_range[::2]]
-    UQ_beta = [np.percentile(df.loc[df["beta"] == beta]["val"].values,75) for beta in beta_range[::2]]
-    ax[i].plot(beta_range[::2],mean_beta)
-    ax[i].fill_between(beta_range[::2],LQ_beta,UQ_beta,alpha=0.4)
+    mean_beta = [np.median(df.loc[df["beta"] == beta]["val"].values) for beta in beta_range]
+    LQ_beta = [np.percentile(df.loc[df["beta"] == beta]["val"].values,25) for beta in beta_range]
+    UQ_beta = [np.percentile(df.loc[df["beta"] == beta]["val"].values,75) for beta in beta_range]
+    ax.plot(np.log10(beta_range),mean_beta,label=t1_type)
+    ax.fill_between(np.log10(beta_range),LQ_beta,UQ_beta,alpha=0.4)
 
     # ax[i].scatter(df["beta"],df["val"])
     # sb.boxplot(data = df, x = "beta",y = "val",ax = ax[i])
-    ax[i].set(xscale="log")
+    # ax.set(xscale="log")
     # ax[i].set(yscale="log")
+ax.set(xlabel=r"$log_{10} \beta$",ylabel=r"$log_{10} \ v_{crit}$")
+ax.legend(loc=2)
+fig.tight_layout()
 fig.show()
 
 
