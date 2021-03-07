@@ -71,7 +71,7 @@ fig.show()
 
 ####energy landscape
 _, RRR,CCI = np.meshgrid(beta_range, rep_range,rep_range, indexing="ij")
-n_t = 2000
+n_t = 4000
 
 
 def extract_energies(file):
@@ -140,14 +140,68 @@ def make_real_t1_fig(scale="linear"):
     ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.6)
-    fig.savefig("paper_plots/Fig3/real_t1s_%s.pdf"%scale,dpi=300)
+    fig.savefig("paper_plots/Fig3/real_t1s_%s_2.pdf"%scale,dpi=300)
 
 make_real_t1_fig("linear")
 make_real_t1_fig("log")
 
 
-def plot_energy(ax,t1_type="forward"):
-    t1_type = "forward"
+def plot_energy(t1_type="forward"):
+    dir_name = "energy_barrier/energies_tot/%s" % t1_type
+    inputs = os.listdir(dir_name)
+    num_cores = multiprocessing.cpu_count()
+
+    def extract_energies(file):
+        try:
+            return np.load("%s/%s" % (dir_name, file))["arr_0"]
+        except:
+            return np.ones(n_t) * np.nan
+
+    out = Parallel(n_jobs=num_cores)(delayed(extract_energies)(inputt) for inputt in inputs)
+    Id = [int(input.split("_")[0]) for input in inputs]
+    li = [int(input.split("_")[1]) for input in inputs]
+    cll_i = [int(input.split("_")[2].split(".npz")[0]) for input in inputs]
+    t1_time = [
+        int(float(np.loadtxt("energy_barrier/t1_time/%s/%d_%d_%d.txt" % (t1_type, Id[i], li[i], cll_i[i]))) / 0.025) for
+        i in range(len(inputs))]
+
+
+    df2 = pd.DataFrame({"Id":Id,"cll_i":cll_i,"E":out})
+    df2 = update_df(df2,beta_dict,lattice_dict)
+    df2["dE"] = [vals[:-1] - vals[1:] for vals in df2["E"]]
+    df2["max dE"] = [np.max(np.abs(val)) for val in df2["dE"]]
+    df2["mask"] = [val<0.05 for val in df2["max dE"]]
+    df2["t1_time"] = t1_time
+
+    fig, ax = plt.subplots(figsize=(3.3,2.5))
+    cols = plt.cm.plasma(np.linspace(0,1,12))
+    for j, beta in enumerate(beta_range):
+        # beta = beta_range[0]
+        n_sample = (df2["beta"] == beta).sum()
+        E_mat = np.ones((n_sample,2*n_t))*np.nan
+        df_sample = df2.loc[df2["beta"] == beta]
+        for i, (E,t1_time,mask) in enumerate(zip(df_sample["E"],df_sample["t1_time"],df_sample["mask"])):
+            if mask:
+                E_mat[i,n_t-t1_time+400:2*n_t-t1_time] = E[400:] - E[400]
+
+        ax.plot(np.arange(-100,1900,0.025)[:n_t+500],np.nanmean(E_mat,axis=0)[:n_t+500],color=cols[j])
+    sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma,
+                               norm=plt.Normalize(vmax=np.log10(beta_range.max()), vmin=np.log10(beta_range.min())))
+    sm._A = []
+    cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
+    cl.set_label(r"$log_{10} \ \beta$")
+    fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
+    ax.set_title(t1_type)
+    # ax.plot((2000,2000),(0.054,0.059),color="k")
+    ax.set(xlabel="t",ylabel=r"$\Delta \epsilon$")
+    fig.savefig("paper_plots/Fig3/real_energy_profiles_%s.pdf"%t1_type,dpi=300)
+
+plot_energy("forward")
+plot_energy("reverse")
+
+
+
+def E_a_2(t1_type="forward"):
     dir_name = "energy_barrier/energies_tot/%s" % t1_type
     inputs = os.listdir(dir_name)
     num_cores = multiprocessing.cpu_count()
@@ -166,8 +220,7 @@ def plot_energy(ax,t1_type="forward"):
     df2["max dE"] = [np.max(np.abs(val)) for val in df2["dE"]]
     df2["mask"] = [val<0.05 for val in df2["max dE"]]
     df2["t1_time"] = t1_time
-    fig, ax = plt.subplots()
-    cols = plt.cm.plasma(np.linspace(0,1,12))
+    dicts = []
     for j, beta in enumerate(beta_range):
         # beta = beta_range[0]
         n_sample = (df2["beta"] == beta).sum()
@@ -176,7 +229,20 @@ def plot_energy(ax,t1_type="forward"):
         for i, (E,t1_time,mask) in enumerate(zip(df_sample["E"],df_sample["t1_time"],df_sample["mask"])):
             if mask:
                 E_mat[i,n_t-t1_time+400:2*n_t-t1_time] = E[400:] - E[400]
-        ax.plot(np.nanmean(E_mat,axis=0)[:n_t+100],color=cols[j])
-    # ax.plot((2000,2000),(0.054,0.059),color="k")
-    ax.set(xlabel="Time",ylabel="E - E_0")
-    fig.show()
+        E_a = E_mat[:,n_t]
+        E_a = E_a[~np.isnan(E_a)]
+        dicts.append(pd.DataFrame({"E_a":E_a,"beta":np.repeat(beta,E_a.size)}))
+    df3 = pd.concat(dicts)
+    return df3
+
+Ear = E_a_2("reverse")
+Eaf = E_a_2("forward")
+fig, ax = plt.subplots()
+sb.lineplot(data=Eaf,x="beta",y="E_a",ax=ax)
+sb.lineplot(data=Ear,x="beta",y="E_a",ax=ax)
+fig.show()
+
+plt.plot(Eaf)
+plt.plot(Ear)
+plt.show()
+

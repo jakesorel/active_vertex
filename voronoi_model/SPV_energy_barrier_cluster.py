@@ -80,7 +80,7 @@ def get_n_t1_cells(beta,v0,Id,cll_i,t1_type="forward"):
     vor.initialize_t1(cll_i,t1_type=t1_type)
     return vor.n_t1_cells
 
-def run_simulation(beta,v0,Id,cll_i,t1_type="forward"):
+def run_simulation(beta,v0,Id,cll_i,t1_type="forward",tfin=20):
     dir_name = "sorted_lattices"
     x = np.loadtxt("%s/x_%d.txt"%(dir_name,Id))
     c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,Id)).astype(np.int64)
@@ -108,7 +108,7 @@ def run_simulation(beta,v0,Id,cll_i,t1_type="forward"):
 
     vor.set_interaction(W = beta*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
 
-    vor.set_t_span(0.025, 100)
+    vor.set_t_span(0.025, tfin)
     vor.n_t = vor.t_span.size
     vor.no_movement_time = 10
 
@@ -123,7 +123,6 @@ def save_simulation(vor,li,Id,cll_i,t1_type="forward"):
     np.savez_compressed("energy_barrier/x_save/%s/%d_%d_%d.npz" % (t1_type,Id, li, cll_i),
                         vor.x_save.reshape(vor.n_t, 2 * vor.n_c))
     np.savez_compressed("energy_barrier/c_types/%s/%d_%d_%d.npz" % (t1_type,Id, li, cll_i), vor.c_types)
-    np.savetxt("energy_barrier/t1_time/%s/%d_%d_%d.txt"% (t1_type,Id, li, cll_i),[vor.t1_time])
 
 def get_v0_opt(beta,li,Id,cll_i,t1_type="forward",n_iter = 5):
     fs = False
@@ -163,8 +162,10 @@ def get_v0_opt(beta,li,Id,cll_i,t1_type="forward",n_iter = 5):
             print(v0_chosen)
     # return v0_chosen,sim
     if fs == True:
-        save_simulation(sim, li,Id, cll_i, t1_type)
+        np.savetxt("energy_barrier/t1_time/%s/%d_%d_%d.txt" % (t1_type, Id, li, cll_i), [sim.t1_time])
         np.savetxt("energy_barrier/opt_v0/%s/%d_%d_%d.txt"% (t1_type,Id, li, cll_i),[v0_chosen])
+        sim = run_simulation(beta, v0_chosen, Id, cll_i, t1_type,tfin=50)
+        save_simulation(sim, li,Id, cll_i, t1_type)
 
 
 

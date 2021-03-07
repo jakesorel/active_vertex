@@ -1,7 +1,9 @@
 from voronoi_model.voronoi_model_periodic import *
 from voronoi_model.t1_functions import *
-li = 1
-dir_name = "lattices"
+beta_i = 11
+beta_range = np.logspace(-3,-1,12)
+li = beta_i*12
+dir_name = "sorted_lattices"
 x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
 c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,li)).astype(np.int64)
 vor = Tissue()
@@ -15,9 +17,9 @@ vor.L = 9
 
 p0 = 3.9
 r = 10
-vor.v0 = 0.1
+vor.v0 = 0.3
 vor.Dr = 1e-1
-beta = 0.001
+beta = beta_range[beta_i]
 
 vor.kappa_A = 1
 vor.kappa_P = 1/r
@@ -31,11 +33,11 @@ c_types = np.zeros(vor.n_c, dtype=np.int64)
 c_types[~A_mask] = 1
 vor.set_interaction(W = beta*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
 
-vor.set_t_span(0.025, 50)
+vor.set_t_span(0.025, 20)
 vor.n_t = vor.t_span.size
 vor.no_movement_time = 10
 
-vor.initialize_t1(0,t1_type="reverse")
+vor.initialize_t1(4,t1_type="reverse")
 
 self = vor
 self.assign_vertices()
@@ -43,6 +45,7 @@ tris,c_types,v_neighbours,neighbours,L,vs,mobile_i,t1_type,n_c,CV_matrix = self.
 vor.plot_scatter = False
 
 tri_i,tri_k,complete = get_t1_dir(tris,c_types,v_neighbours,neighbours,L,vs,mobile_i,self.n_c,self.CV_matrix,t1_type)
+# vor.x = vor.x_save[2000]
 
 fig, ax = plt.subplots()
 self.plot_vor(vor.x,ax)
@@ -68,5 +71,33 @@ vor.simulate_t1(equiangulate=True)
 # fig.savefig("plots/time_course_t1.pdf")
 
 
-vor.animate(n_frames=30)
+vor.animate(n_frames=15)
 
+x_save, tri_save = vor.x_save,vor.tri_save
+
+
+def get_energy(self, x, tris,kappa_A, kappa_P, J, get_l_interface):
+    self.x = x
+    self._triangulate_periodic(self.x)
+    # self.tris = tris
+    # self.Cents = x[self.tris]
+    # self.vs = self.get_vertex_periodic()
+    self.assign_vertices()
+    A = self.get_A_periodic(self.neighbours, self.vs)
+    P = self.get_P_periodic(self.neighbours, self.vs)
+    l_int = get_l_interface(self.n_v, self.n_c, self.neighbours, self.vs, self.CV_matrix, self.L)
+    energy = kappa_A * (A - self.A0) ** 2 + kappa_P * (P - self.P0) ** 2 + np.sum(l_int * J,axis=0)
+    return energy
+
+energies = np.zeros((vor.n_t, vor.n_c))
+for i, (x, tris) in enumerate(zip(x_save, tri_save)):
+    energies[i] = get_energy(vor, x, tris, vor.kappa_A, vor.kappa_P, vor.J, get_l_interface)
+
+plt.close("all")
+# plt.plot(energies.sum(axis=1))
+# plt.show()
+plt.plot(energies.sum(axis=1)[int(10/0.025):] - energies.sum(axis=1)[int(10/0.025)])
+plt.show()
+
+plt.plot(energies[:,vor.mobile_i][int(10/0.025):])
+plt.show()

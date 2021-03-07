@@ -1162,6 +1162,7 @@ class Tissue:
 
 
 
+
         def initialize_t1(self,i,t1_type = "forward"):
             self.t1_type = t1_type
             self._triangulate_periodic(self.x)
@@ -1409,7 +1410,7 @@ class Tissue:
                 self.p_self_self_t[i] = p_self_self
                 self.p_self_self[i] = p_self_self.mean()
 
-        def get_self_self_interface(self,nT = 100):
+        def get_self_self_interface(self,nT = 100,t_sel = None):
             """
             Calculates the fraction of a cell's perimeter that is a boundary with another cell type (on average)
             Saves this to self.self_self_interface
@@ -1419,8 +1420,10 @@ class Tissue:
             :param nT: Number of time-steps to consider
             :return: self.self_self_interface and time-point selection
             """
-            t_sel = np.linspace(0,self.n_t-1,nT).astype(int)
-
+            if t_sel is None:
+                t_sel = np.linspace(0,self.n_t-1,nT).astype(int)
+            else:
+                nT = t_sel.size
             I,J = np.meshgrid(self.c_types,self.c_types,indexing="ij")
             SS = (I==J)*1.0
 
