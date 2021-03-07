@@ -1,63 +1,48 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from voronoi_model.voronoi_model_periodic import *
+from scipy.stats import linregress
 plt.rcParams.update({'pdf.fonttype': 42})
 
+def initialize_vor(Id, i, run):
+    vor = Tissue()
+    vor.generate_cells(600)
+    vor.make_init_balanced(9, noise=0.0005)
+    p0 = 3.9
+    r = 10
+    vor.v0 = 5e-3
+    vor.Dr = 1e-1
+    beta = 0.1
 
-N = 12
-rep = 12
-# p0_range = np.linspace(3.5, 4, N)
-# v0_range = np.linspace(5e-3, 1e-1, N)
-# beta_range = np.linspace(0, 0.3)
-v0_range = np.linspace(5e-3, 1e-1, N)
-beta_range = np.logspace(-3, -1, N)
-rep_range = np.arange(rep)
-VV, BB,RR = np.meshgrid(v0_range, beta_range,rep_range, indexing="ij")
-ID_mat = np.arange(N**2).astype(int).reshape(N,N)
-ID_mat = np.stack([ID_mat for i in range(rep)],axis=2)
+    vor.kappa_A = 1
+    vor.kappa_P = 1 / r
+    vor.A0 = 1
+    vor.P0 = p0
+    vor.a = 0.3
+    vor.k = 0
 
-print(ID_mat[np.where((VV==v0_range[7])*(BB==beta_range[5]))])
+    vor.set_interaction(W=(2 * beta * vor.P0 / r) * np.array([[0, 1], [1, 0]]), pE=0.5)
 
-#84 (7,0); 89 (7,5), 95 (7,11)
-
-vor = Tissue()
-vor.generate_cells(600)
-vor.make_init_balanced(9, noise=0.0005)
-p0 = 3.9
-r = 10
-vor.v0 = 5e-3
-vor.Dr = 1e-1
-beta = 0.1
-
-vor.kappa_A = 1
-vor.kappa_P = 1 / r
-vor.A0 = 1
-vor.P0 = p0
-vor.a = 0.3
-vor.k = 0
-
-vor.set_interaction(W=(2 * beta * vor.P0 / r) * np.array([[0, 1], [1, 0]]), pE=0.5)
-
-vor.set_t_span(0.05, 2000)
+    vor.set_t_span(0.025, 500)
 
 
-Id, i, run = 95,0,0
-tri_save = np.load("from_unsorted/tri_save/%d_%d_%d.npz" % (Id, i, run))["arr_0"]
-tri_save = tri_save.reshape(tri_save.shape[0], -1, 3)
-x_save = np.load("from_unsorted/x_save/%d_%d_%d.npz" % (Id, i, run))["arr_0"]
-x_save = x_save.reshape(x_save.shape[0], -1, 2)
-c_types = np.load("from_unsorted/c_types/%d_%d_%d.npz" % (Id, i, run))["arr_0"]
 
-vor.n_t = tri_save.shape[0]
-vor.n_c = x_save.shape[1]
-vor.n_v = tri_save.shape[1]
+    tri_save = np.load("from_unsorted/tri_save/%d_%d_%d.npz" % (Id, i, run))["arr_0"]
+    tri_save = tri_save.reshape(tri_save.shape[0], -1, 3)
+    x_save = np.load("from_unsorted/x_save/%d_%d_%d.npz" % (Id, i, run))["arr_0"]
+    x_save = x_save.reshape(x_save.shape[0], -1, 2)
+    c_types = np.load("from_unsorted/c_types/%d_%d_%d.npz" % (Id, i, run))["arr_0"]
 
-vor.c_types = c_types
-vor.x_save = x_save
-# vor.tri_save = tri_save
+    vor.n_t = tri_save.shape[0]
+    vor.n_c = x_save.shape[1]
+    vor.n_v = tri_save.shape[1]
+
+    vor.c_types = c_types
+    vor.x_save = x_save
+    # vor.tri_save = tri_save
+    return vor
 
 
-T = 15000
 
 def get_x2(T,L,x_save):
     x_s = x_save[T:]
@@ -71,53 +56,10 @@ def get_disp(T,L,x_save):
     # x2 = disp[:,:,0]**2 + disp[:,:,1]**2
     return disp +x_s[0]
 
-vor.plot_scatter = False
-fig, ax = plt.subplots()
-vor.plot_vor(vor.x_save[T],ax)
-x_save_mod = get_disp(T,vor.L,x_save)
-# x_s = x_save[T:]
-# L = vor.L
-# disp = np.mod(x_s - x_s[0] + L / 2, L) - L / 2
-# x_save_mod = disp
-cll_alpha = 0.3
-vor.cols = vor.cols[0][:3] + (cll_alpha,),vor.cols[1][:3] + (cll_alpha,)
-line_alpha = 0.8
-cols = vor.cols
-cols = cols[0][:3] + (line_alpha,),cols[1][:3] + (line_alpha,)
-a_clls = (vor.c_types).astype(np.bool_)
-b_clls = (1-vor.c_types).astype(np.bool_)
-ax.plot(x_save_mod[:,a_clls,0],x_save_mod[:,a_clls,1],color=cols[1])
-ax.plot(x_save_mod[:,b_clls,0],x_save_mod[:,b_clls,1],color=cols[0])
-# X,Y = x_save_mod[-1].T
-# dX, dY = (x_save_mod[-1]-x_save_mod[-2]).T
-# M = np.sqrt(dX**2 + dY**2)
-# dX /= M
-# dY /=M
-# ax.quiver(X[a_clls],Y[a_clls],dX[a_clls],dY[a_clls],color=cols[0],minshaft=0,pivot="mid")
-# ax.quiver(X[b_clls],Y[b_clls],dX[b_clls],dY[b_clls],color=cols[1],minshaft=0,pivot="mid")
-ax.axis("off")
-fig.show()
-fig.savefig("paper_plots/Fig1/diffusive_movement_v07_b11.pdf",dpi=300)
-
-vor.animate(n_frames = 30)
-
-fig, ax = plt.subplots()
-ax.plot(get_x2(T,vor.L,vor.x_save).mean(axis=1))
-fig.show()
-
-vor.plot_scatter=False
-x2fin = np.clip(get_x2(T,vor.L,vor.x_save)[-1],0,5)
-cols = plt.cm.plasma((x2fin - x2fin.min()) / (x2fin.max() - x2fin.min()))
-
-fig, ax = plt.subplots()
-vor.plot_vor(vor.x_save[T],ax)
-x_save_mod = get_disp(T,vor.L,x_save)
-ax.scatter(vor.x_save[T,:,0],vor.x_save[T,:,1],c = cols,zorder=100)
-fig.show()
-
-
-###Diffusion coefficient as a function of phi_self?
-
+def get_D(vor,T = 15000):
+    x2 = get_x2(T, vor.L, vor.x_save)
+    x2_mean = x2.mean(axis=1)
+    D = linregress(vor.t_span[T:],x2_mean).slope/(2*2)
 
 
 @jit(nopython=True)
