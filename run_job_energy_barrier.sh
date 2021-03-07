@@ -2,7 +2,7 @@
 
 #Submit this script with: sbatch thefilename
 
-#SBATCH --time=2:00:00   # walltime
+#SBATCH --time=0:10:00   # walltime
 #SBATCH --ntasks=1   # number of processor cores (i.e. tasks)
 #SBATCH -J "active_vertex"   # job name
 #SBATCH --output=output_energy_barrier.out
