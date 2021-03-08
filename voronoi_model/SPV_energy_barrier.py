@@ -1,6 +1,6 @@
 from voronoi_model.voronoi_model_periodic import *
 from voronoi_model.t1_functions import *
-beta_i = 11
+beta_i = 4
 beta_range = np.logspace(-3,-1,12)
 li = beta_i*12
 dir_name = "sorted_lattices"
@@ -17,7 +17,7 @@ vor.L = 9
 
 p0 = 3.9
 r = 10
-vor.v0 = 0.3
+vor.v0 = 0.1
 vor.Dr = 1e-1
 beta = beta_range[beta_i]
 
@@ -33,11 +33,11 @@ c_types = np.zeros(vor.n_c, dtype=np.int64)
 c_types[~A_mask] = 1
 vor.set_interaction(W = beta*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
 
-vor.set_t_span(0.025, 20)
+vor.set_t_span(0.025, 50)
 vor.n_t = vor.t_span.size
 vor.no_movement_time = 10
 
-vor.initialize_t1(4,t1_type="reverse")
+vor.initialize_t1(0,t1_type="reverse")
 
 self = vor
 self.assign_vertices()
@@ -58,17 +58,17 @@ for i in range(self.n_c):
 fig.show()
 
 vor.simulate_t1(equiangulate=True)
-#
-# t1_time_i = int(np.round(vor.t1_time/vor.dt))
-# dt_i = 400
-# n_plot = 2
-# t_span_sample = np.arange(-dt_i*n_plot+t1_time_i,(2*n_plot+1)*dt_i+t1_time_i,dt_i)
-# fig, ax = plt.subplots(1,t_span_sample.size,figsize=(15,4))
-# for i, ti in enumerate(t_span_sample):
-#     vor.plot_vor(vor.x_save[ti],ax=ax[i])
-#     ax[i].axis("off")
+
+t1_time_i = int(np.round(vor.t1_time/vor.dt))
+dt_i = 200
+n_plot = 2
+t_span_sample = np.arange(-dt_i*n_plot+t1_time_i,dt_i+t1_time_i,dt_i)
+fig, ax = plt.subplots(1,t_span_sample.size,figsize=(8,4))
+for i, ti in enumerate(t_span_sample):
+    vor.plot_vor(vor.x_save[ti],ax=ax[i])
+    ax[i].axis("off")
 # fig.show()
-# fig.savefig("plots/time_course_t1.pdf")
+fig.savefig("paper_plots/Fig3/time_course_t1_reverse_2.pdf")
 
 
 vor.animate(n_frames=15)

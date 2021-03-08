@@ -1,8 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from voronoi_model.voronoi_model_periodic import *
+from voronoi_model_periodic import *
 from scipy.stats import linregress
-plt.rcParams.update({'pdf.fonttype': 42})
+# plt.rcParams.update({'pdf.fonttype': 42})
+import sys
+
+def make_directory(dir_name):
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+
 
 def initialize_vor(Id, i, run):
     vor = Tissue()
@@ -39,7 +45,7 @@ def initialize_vor(Id, i, run):
 
     vor.c_types = c_types
     vor.x_save = x_save
-    # vor.tri_save = tri_save
+    vor.tri_save = tri_save
     return vor
 
 
@@ -60,7 +66,7 @@ def get_D(vor,T = 15000):
     x2 = get_x2(T, vor.L, vor.x_save)
     x2_mean = x2.mean(axis=1)
     D = linregress(vor.t_span[T:],x2_mean).slope/(2*2)
-
+    return D,x2_mean
 
 @jit(nopython=True)
 def any_axis_1(mask):
@@ -269,34 +275,22 @@ def get_quart_types(tri_save, c_types,changed_t):
         quart_types[ti] = get_quart_type_from_conf_type(conf_type, types, inv_types, recip_types, recip_inv_types, type_n)
     return quart_types
 
-t1_swap_freq,changed_t = get_T1_swap_frequencies(tri_save,c_types,cache_T=20)
+if __name__ == "__main__":
+    Id = int(sys.argv[1])
+    N = int(sys.argv[2])
+    rep = int(sys.argv[3])
 
+    make_directory("from_unsorted/jamming_analysis")
+    for i in range(rep):
+        for run in range(2):
+            vor = initialize_vor(Id,i,run)
 
-types = np.array(((0, 0, 0, 0),
-                      (0, 0, 0, 1),
-                      (0, 0, 1, 0),
-                      (0, 0, 1, 1),
-                      (1, 0, 0, 1),
-                      (0, 1, 0, 1)))
-type_names = [str(typee) for typee in types]
+            D,x2_mean = get_D(vor, T=15000)
 
-fig, ax = plt.subplots()
-for i in range(6):
-    ax.plot(vor.t_span[changed_t],np.cumsum(t1_swap_freq[:,i]),label=type_names[i])
-ax.legend()
-ax.set(xlabel="Time",ylabel="Cumulative number of T1 swaps")
-fig.show()
+            t1_swap_freq,changed_t = get_T1_swap_frequencies(vor.tri_save,vor.c_types,cache_T=20)
 
-quart_types = get_quart_types(tri_save, c_types,changed_t)
+            quart_types = get_quart_types(vor.tri_save, vor.c_types,changed_t)
 
-av_rate = (t1_swap_freq/quart_types).sum(axis=0) / (vor.t_span[-1] + vor.dt)
+            av_rate = (t1_swap_freq/quart_types).sum(axis=0) / (vor.t_span[-1] + vor.dt)
 
-
-df = pd.DataFrame({"type":type_names,"rate":av_rate})
-
-fig, ax = plt.subplots()
-sb.barplot(data = df,x="type",y="rate")
-ax.set(xlabel="Type",ylabel="Rate = "r"$\frac{\sum_t^T (N_{swap,type}/N_{type})}{T}$")
-fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.9)
-fig.show()
-fig.savefig("paper_plots/Fig1/T1_types_2.pdf",dpi=300)
+            np.savez_compressed("from_unsorted/jamming_analysis/%d_%d_%d.npz" % (Id, i, run),changed_t=changed_t,t1_swap_freq=t1_swap_freq,quart_types=quart_types,av_rate=av_rate,D=D,x2_mean=x2_mean)

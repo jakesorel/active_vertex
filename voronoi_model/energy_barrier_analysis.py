@@ -20,7 +20,7 @@ def make_df(t1_type):
     return pd.DataFrame(dics)
 
 beta_range = np.logspace(-3, -1, 12)
-rep_range = np.arange(12)
+rep_range = np.arange(20)
 BB, RR = np.meshgrid(beta_range, rep_range, indexing="ij")
 beta_dict = dict(zip(np.arange(BB.size),BB.ravel()))
 lattice_dict = dict(zip(np.arange(BB.size),RR.ravel()))
@@ -71,7 +71,8 @@ fig.show()
 
 ####energy landscape
 _, RRR,CCI = np.meshgrid(beta_range, rep_range,rep_range, indexing="ij")
-n_t = 4000
+n_t = 800
+n_tlong = 2000
 
 
 def extract_energies(file):
@@ -105,6 +106,13 @@ fig.show()
 def plot_E_a(ax,t1_type="forward",col="red",label="Sorting",scale="linear"):
     # t1_type = "reverse"
     dir_name = "energy_barrier/energies_tot/%s" % t1_type
+
+    def extract_energies(file):
+        try:
+            return np.load("%s/%s" % (dir_name, file))["arr_0"]
+        except:
+            return np.ones(n_t) * np.nan
+
     inputs = os.listdir(dir_name)
     num_cores = multiprocessing.cpu_count()
     out = Parallel(n_jobs=num_cores)(delayed(extract_energies)(inputt) for inputt in inputs)
@@ -140,7 +148,7 @@ def make_real_t1_fig(scale="linear"):
     ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.6)
-    fig.savefig("paper_plots/Fig3/real_t1s_%s_2.pdf"%scale,dpi=300)
+    fig.savefig("paper_plots/Fig3/real_t1s_%s_3.pdf"%scale,dpi=300)
 
 make_real_t1_fig("linear")
 make_real_t1_fig("log")
@@ -153,9 +161,9 @@ def plot_energy(t1_type="forward"):
 
     def extract_energies(file):
         try:
-            return np.load("%s/%s" % (dir_name, file))["arr_0"]
+            return np.load("%s/%s" % (dir_name, file))["arr_0"][:n_tlong]
         except:
-            return np.ones(n_t) * np.nan
+            return np.ones(n_tlong) * np.nan
 
     out = Parallel(n_jobs=num_cores)(delayed(extract_energies)(inputt) for inputt in inputs)
     Id = [int(input.split("_")[0]) for input in inputs]
@@ -178,13 +186,13 @@ def plot_energy(t1_type="forward"):
     for j, beta in enumerate(beta_range):
         # beta = beta_range[0]
         n_sample = (df2["beta"] == beta).sum()
-        E_mat = np.ones((n_sample,2*n_t))*np.nan
+        E_mat = np.ones((n_sample,2*n_tlong))*np.nan
         df_sample = df2.loc[df2["beta"] == beta]
         for i, (E,t1_time,mask) in enumerate(zip(df_sample["E"],df_sample["t1_time"],df_sample["mask"])):
             if mask:
-                E_mat[i,n_t-t1_time+400:2*n_t-t1_time] = E[400:] - E[400]
+                E_mat[i,n_tlong-t1_time+400:2*n_tlong-t1_time] = E[400:] - E[400]
 
-        ax.plot(np.arange(-100,1900,0.025)[:n_t+500],np.nanmean(E_mat,axis=0)[:n_t+500],color=cols[j])
+        ax.plot(np.arange(-n_tlong*0.025,n_tlong*0.025,0.025)[:n_t+400],np.nanmean(E_mat,axis=0)[:n_tlong+400],color=cols[j])
     sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma,
                                norm=plt.Normalize(vmax=np.log10(beta_range.max()), vmin=np.log10(beta_range.min())))
     sm._A = []
@@ -194,7 +202,7 @@ def plot_energy(t1_type="forward"):
     ax.set_title(t1_type)
     # ax.plot((2000,2000),(0.054,0.059),color="k")
     ax.set(xlabel="t",ylabel=r"$\Delta \epsilon$")
-    fig.savefig("paper_plots/Fig3/real_energy_profiles_%s.pdf"%t1_type,dpi=300)
+    fig.savefig("paper_plots/Fig3/real_energy_profiles_%s_2.pdf"%t1_type,dpi=300)
 
 plot_energy("forward")
 plot_energy("reverse")
@@ -203,6 +211,13 @@ plot_energy("reverse")
 
 def E_a_2(t1_type="forward"):
     dir_name = "energy_barrier/energies_tot/%s" % t1_type
+
+    def extract_energies(file):
+        try:
+            return np.load("%s/%s" % (dir_name, file))["arr_0"][:n_tlong]
+        except:
+            return np.ones(n_tlong) * np.nan
+
     inputs = os.listdir(dir_name)
     num_cores = multiprocessing.cpu_count()
     out = Parallel(n_jobs=num_cores)(delayed(extract_energies)(inputt) for inputt in inputs)
@@ -218,18 +233,18 @@ def E_a_2(t1_type="forward"):
     df2 = update_df(df2,beta_dict,lattice_dict)
     df2["dE"] = [vals[:-1] - vals[1:] for vals in df2["E"]]
     df2["max dE"] = [np.max(np.abs(val)) for val in df2["dE"]]
-    df2["mask"] = [val<0.05 for val in df2["max dE"]]
+    df2["mask"] = [val<0.1 for val in df2["max dE"]]
     df2["t1_time"] = t1_time
     dicts = []
     for j, beta in enumerate(beta_range):
         # beta = beta_range[0]
         n_sample = (df2["beta"] == beta).sum()
-        E_mat = np.ones((n_sample,2*n_t))*np.nan
+        E_mat = np.ones((n_sample,2*n_tlong))*np.nan
         df_sample = df2.loc[df2["beta"] == beta]
         for i, (E,t1_time,mask) in enumerate(zip(df_sample["E"],df_sample["t1_time"],df_sample["mask"])):
             if mask:
-                E_mat[i,n_t-t1_time+400:2*n_t-t1_time] = E[400:] - E[400]
-        E_a = E_mat[:,n_t]
+                E_mat[i,n_tlong-t1_time+400:2*n_tlong-t1_time] = E[400:] - E[400]
+        E_a = E_mat[:,n_tlong]
         E_a = E_a[~np.isnan(E_a)]
         dicts.append(pd.DataFrame({"E_a":E_a,"beta":np.repeat(beta,E_a.size)}))
     df3 = pd.concat(dicts)
@@ -241,6 +256,9 @@ fig, ax = plt.subplots()
 sb.lineplot(data=Eaf,x="beta",y="E_a",ax=ax)
 sb.lineplot(data=Ear,x="beta",y="E_a",ax=ax)
 fig.show()
+
+
+
 
 plt.plot(Eaf)
 plt.plot(Ear)
