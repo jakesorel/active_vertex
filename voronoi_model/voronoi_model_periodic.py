@@ -1114,6 +1114,59 @@ class Tissue:
             print("Simulation complete")
             return self.x_save
 
+        def beta_t(self,t):
+            return _beta_t(self.beta_max, self.beta_min,self.tau,t)
+
+
+        def simulate_dynamic_beta(self,print_every=1000,variable_param=False,equiangulate=True):
+            """
+            Evolve the SPV.
+
+            Stores:
+                self.x_save = Cell centroids for each time-step (n_t x n_c x 2), where n_t is the number of time-steps
+                self.tri_save = Triangulation for each time-step (n_t x n_v x 3)
+
+
+            :param print_every: integer value to skip printing progress every "print_every" iterations.
+            :param variable_param: Set this to True if kappa_A,kappa_P are vectors rather than single values
+            :return: self.x_save
+            """
+            if variable_param is True:
+                F_get = self.get_F_periodic_param
+            else:
+                F_get = self.get_F_periodic
+            if equiangulate is True:
+                triangulate = self.triangulate_periodic
+            else:
+                triangulate = self._triangulate_periodic
+            self.J0 = self.J.copy()
+            n_t = self.t_span.size
+            self.n_t = n_t
+            x = self.x0.copy()
+            self._triangulate_periodic(x)
+            self.x = x.copy()
+            self.x_save = np.zeros((n_t,self.n_c,2))
+            self.tri_save = np.zeros((n_t,self.tris.shape[0],3),dtype=np.int32)
+            self.generate_noise()
+            for i, t in enumerate(self.t_span):
+                if i % print_every == 0:
+                    print(i / n_t * 100, "%")
+                triangulate(x)
+                self.tri_save[i] = self.tris
+                self.assign_vertices()
+                self.get_A_periodic(self.neighbours,self.vs)
+                self.get_P_periodic(self.neighbours,self.vs)
+                self.J = self.J0*self.beta_t(t)
+                F = F_get(self.neighbours,self.vs)
+
+                F_soft = weak_repulsion(self.Cents,self.a,self.k, self.CV_matrix,self.n_c,self.L)
+                x += self.dt*(F + F_soft + self.v0*self.noise[i])
+                x = np.mod(x,self.L)
+                self.x = x
+                self.x_save[i] = x
+            print("Simulation complete")
+            return self.x_save
+
 
         def get_t1_forward_cells(self):
             tc_type = self.c_types[self.tris]
@@ -2901,3 +2954,11 @@ def get_M(tri_i,tri_j,vs,x,tris,L):
                 M[:, Fdim, i] += DHDR[i, Fdim] * direc
     M = M[0] + M[1]
     return M
+
+
+@jit(nopython=True, cache=True)
+def _beta_t(beta_max, beta_min, tau, t):
+    if t <= tau:
+        return beta_min + (beta_max - beta_min) * t / tau
+    else:
+        return beta_max

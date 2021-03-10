@@ -2,7 +2,7 @@
 
 #Submit this script with: sbatch thefilename
 
-#SBATCH --time=2:00:00   # walltime
+#SBATCH --time=2:30:00   # walltime
 #SBATCH --ntasks=1   # number of processor cores (i.e. tasks)
 #SBATCH -J "active_vertex"   # job name
 #SBATCH --output=output.out
@@ -11,4 +11,5 @@
 
 source activate apical_domain
 
-python voronoi_model/SPV_from_file_cluster.py "$1" "$2" "$3" "$4"
+#python voronoi_model/SPV_from_file_cluster.py "$1" "$2" "$3" "$4"
+python voronoi_model/SPV_from_file_cluster_dynamic_beta.py "$1" "$2" "$3" "$4"
