@@ -36,7 +36,7 @@ def run_simulation(X):
     vor.a = 0.3
     vor.k = 0
 
-    vor.set_interaction(W = np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
+    vor.set_interaction(W = beta_max*np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
 
 
     vor.set_t_span(0.025,500)
@@ -45,7 +45,7 @@ def run_simulation(X):
     vor.beta_min = 10 ** -2.5
     vor.beta_max = beta_max
 
-    vor.simulate_dynamic_beta(equiangulate=False)
+    vor.simulate(equiangulate=False)
 
     np.savez_compressed("from_unsorted_control/tri_save_tau0/%d_%d_%d.npz"%(Id,rep,run),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
     np.savez_compressed("from_unsorted_control/x_save_tau0/%d_%d_%d.npz"%(Id,rep,run),vor.x_save.reshape(vor.n_t,2*vor.n_c))
