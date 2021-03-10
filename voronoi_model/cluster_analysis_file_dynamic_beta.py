@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import sys
 
 
+def make_directory(dir_name):
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
 
 @jit(nopython=True,cache=True)
 def type_im_fast(XX,YY,res,x,L,c_types):
@@ -79,7 +82,7 @@ def get_L_star(x_save,skip,mult,L,c_types,res):
 
 
 if __name__ == "__main__":
-
+    make_directory("from_unsorted_control/analysis")
     vor = Tissue()
     vor.generate_cells(600)
     vor.make_init_balanced(9, noise=0.0005)
@@ -105,11 +108,11 @@ if __name__ == "__main__":
         for i in range(int(sys.argv[3])):
             for run in range(2):
                 try:
-                    tri_save = np.load("from_unsorted/tri_save/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
+                    tri_save = np.load("from_unsorted_control/tri_save/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
                     tri_save = tri_save.reshape(tri_save.shape[0], -1, 3)
-                    x_save = np.load("from_unsorted/x_save/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
+                    x_save = np.load("from_unsorted_control/x_save/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
                     x_save = x_save.reshape(x_save.shape[0], -1, 2)
-                    c_types = np.load("from_unsorted/c_types/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
+                    c_types = np.load("from_unsorted_control/c_types/%d_%d_%d.npz" % (Id,i,run))["arr_0"]
 
                     vor.n_t = tri_save.shape[0]
                     vor.n_c = x_save.shape[1]
@@ -125,10 +128,10 @@ if __name__ == "__main__":
                     n_bound = vor.get_num_boundaries(100)
                     mean_self = vor.self_self_interface.mean(axis=1)
 
-                    skip = int(vor.n_t / 100)
-                    rads, L_star = get_L_star(vor.x_save, skip, 10, vor.L, vor.c_types, res=40)
+                    # skip = int(vor.n_t / 100)
+                    # rads, L_star = get_L_star(vor.x_save, skip, 10, vor.L, vor.c_types, res=40)
 
-                    np.savez_compressed("from_unsorted/analysis/%d_%d.npz" % (Id,i + run*int(sys.argv[3])), n_islands=n_islands, n_bound=n_bound, L_star=L_star,
+                    np.savez_compressed("from_unsorted_control/analysis/%d_%d.npz" % (Id,i + run*int(sys.argv[3])), n_islands=n_islands, n_bound=n_bound,
                                         mean_self=mean_self)
                 except FileNotFoundError:
                     print("False")

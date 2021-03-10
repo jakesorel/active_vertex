@@ -11,46 +11,46 @@ def make_directory(dir_name):
 
 def run_simulation(X):
     tau, beta_max, Id,rep,run = X
-    # if not path.exists("from_unsorted/tri_save/%d_%d_%d.npz"%(Id,rep,run)):
-    li = rep + run*int(sys.argv[3])
-    dir_name = "lattices"
-    x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
-    c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,li)).astype(np.int64)
-    vor = Tissue()
-    vor.generate_cells(600)
-    vor.x = x
-    vor.x0 = vor.x
-    vor.n_c = vor.x0.shape[0]
-    vor.n_C = vor.n_c
-    vor.L = 9
+    if not path.exists("from_unsorted_control/tri_save/%d_%d_%d.npz"%(Id,rep,run)):
+        li = rep + run*int(sys.argv[3])
+        dir_name = "lattices"
+        x = np.loadtxt("%s/x_%d.txt"%(dir_name,li))
+        c_types = np.loadtxt("%s/c_types_%d.txt"%(dir_name,li)).astype(np.int64)
+        vor = Tissue()
+        vor.generate_cells(600)
+        vor.x = x
+        vor.x0 = vor.x
+        vor.n_c = vor.x0.shape[0]
+        vor.n_C = vor.n_c
+        vor.L = 9
 
 
-    r = 10
-    vor.v0 = 0.075
-    vor.Dr = 1e-1
-    # beta = beta
+        r = 10
+        vor.v0 = 0.075
+        vor.Dr = 1e-1
+        # beta = beta
 
-    vor.kappa_A = 1
-    vor.kappa_P = 1/r
-    vor.A0 = 1
-    vor.P0 = 3.9
-    vor.a = 0.3
-    vor.k = 0
+        vor.kappa_A = 1
+        vor.kappa_P = 1/r
+        vor.A0 = 1
+        vor.P0 = 3.9
+        vor.a = 0.3
+        vor.k = 0
 
-    vor.set_interaction(W = np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
+        vor.set_interaction(W = np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
 
 
-    vor.set_t_span(0.025,500)
+        vor.set_t_span(0.025,500)
 
-    vor.tau = tau
-    vor.beta_min = 10 ** -2.5
-    vor.beta_max = beta_max
+        vor.tau = tau
+        vor.beta_min = 10 ** -2.5
+        vor.beta_max = beta_max
 
-    vor.simulate_dynamic_beta(equiangulate=False)
+        vor.simulate_dynamic_beta(equiangulate=False)
 
-    np.savez_compressed("from_unsorted_control/tri_save/%d_%d_%d.npz"%(Id,rep,run),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
-    np.savez_compressed("from_unsorted_control/x_save/%d_%d_%d.npz"%(Id,rep,run),vor.x_save.reshape(vor.n_t,2*vor.n_c))
-    np.savez_compressed("from_unsorted_control/c_types/%d_%d_%d.npz"%(Id,rep,run),vor.c_types)
+        np.savez_compressed("from_unsorted_control/tri_save/%d_%d_%d.npz"%(Id,rep,run),vor.tri_save.reshape(vor.n_t,3*vor.n_v))
+        np.savez_compressed("from_unsorted_control/x_save/%d_%d_%d.npz"%(Id,rep,run),vor.x_save.reshape(vor.n_t,2*vor.n_c))
+        np.savez_compressed("from_unsorted_control/c_types/%d_%d_%d.npz"%(Id,rep,run),vor.c_types)
 
 
 
