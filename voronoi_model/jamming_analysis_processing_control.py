@@ -7,69 +7,34 @@ from voronoi_model.plotting_functions import *
 from scipy.optimize import curve_fit
 plt.rcParams.update({'pdf.fonttype': 42})
 
+
 N = 12
 rep = 12
 # p0_range = np.linspace(3.5, 4, N)
 # v0_range = np.linspace(5e-3, 1e-1, N)
 # beta_range = np.linspace(0, 0.3)
-v0_range = np.linspace(5e-3, 1e-1, N)
-beta_range = np.logspace(-3, -1, N)
+tau_range = np.linspace(50, 500, N)
+beta_max_range = np.logspace(-2.5, -1, N)
+
 rep_range = np.arange(rep)
-VV, BB,RR = np.meshgrid(v0_range, beta_range,rep_range, indexing="ij")
+TT, BB,RR = np.meshgrid(tau_range, beta_max_range,rep_range, indexing="ij")
 ID_mat = np.arange(N**2).astype(int).reshape(N,N)
 ID_mat = np.stack([ID_mat for i in range(rep)],axis=2)
 
 inputs = np.array([ID_mat.ravel(),RR.ravel()]).T
 
+BBt0,RRt0 = np.meshgrid(beta_max_range,rep_range, indexing="ij")
+ID_matt0 = np.stack([np.arange(N) for i in range(rep)],axis=1)
+inputs_tau0 = np.array([ID_matt0.ravel(),RRt0.ravel()]).T
+
 t_span = np.arange(0,500,0.025)[15000:]
-
-def D_func(t,D):
-    return 2*2*t*D
-
-def get_D(X):
-    Id, Rep = X
-    i, run = (Rep%6), int(Rep/6)
-    try:
-        FILE = np.load("from_unsorted/jamming_analysis/%d_%d_%s.npz" % (Id,i,run))
-        D = curve_fit(D_func,t_span,FILE["x2_mean"])[0][0]
-        return D
-    except FileNotFoundError:
-        return np.nan
-
-num_cores = multiprocessing.cpu_count()
-D = Parallel(n_jobs=num_cores)(delayed(get_D)(inputt) for inputt in inputs)
-D = np.array(D).reshape(N,N,rep)
-
-D_mean = np.nanmean(D,axis=-1)
-#np.nanpercentile(D_mean,10)
-fig, ax = plt.subplots(figsize=(3,2.5))
-extent, aspect = make_extent(v0_range,np.log10(beta_range))
-vmin,vmax = np.nanpercentile(D_mean,0),np.nanpercentile(D_mean,80)
-ax.imshow(flipim(D_mean),extent=extent,aspect=aspect,cmap=plt.cm.inferno,vmin=vmin,vmax=vmax)
-sm = plt.cm.ScalarMappable(cmap=plt.cm.inferno, norm=plt.Normalize(vmax=vmax, vmin=vmin))
-sm._A = []
-fmt = ticker.ScalarFormatter(useMathText=True)
-fmt.set_powerlimits((0, 0))
-cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical",format=fmt)
-
-cl.set_label(r"$D$")
-ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
-fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
-fig.show()
-fig.savefig("paper_plots/Fig1/D_phase_diag.pdf",dpi=300)
-
-fig, ax = plt.subplots()
-for i in range(1,12):
-    sb.lineplot(data = pd.DataFrame({"D":D[i].ravel(),"v0":VV[i].ravel(),"rep":RR[i].ravel(),"beta":BB[i].ravel(),"log beta":np.log10(BB[i].ravel())}),x="log beta",y="D",color=plt.cm.plasma(i/12))
-ax.set()
-fig.show()
 
 
 def get_tot_t1(X):
     Id, Rep = X
     i, run = (Rep%6), int(Rep/6)
     try:
-        FILE = np.load("from_unsorted/jamming_analysis/%d_%d_%s.npz" % (Id,i,run))
+        FILE = np.load("from_unsorted_control/jamming_analysis/%d_%d_%s.npz" % (Id,i,run))
         return FILE["t1_swap_freq"].sum(axis=0)
         # return FILE["av_rate"]
 
@@ -80,16 +45,15 @@ num_cores = multiprocessing.cpu_count()
 tot_t1 = Parallel(n_jobs=num_cores)(delayed(get_tot_t1)(inputt) for inputt in inputs)
 tot_t1 = np.array(tot_t1).reshape(N,N,rep,6)
 
-# tot_t1_mean = tot_t1[:,:,:,4].mean(axis=2)
-tot_t1_mean = tot_t1[:,:,0,4]
 
+tot_t1_mean = tot_t1[:,:,:,4].mean(axis=2)
 tot_t1_mean[np.isinf(tot_t1_mean)] = np.nan
 
 # tot_t1_mean = tot_t1_mean[:8]
 
 fig, ax = plt.subplots(figsize=(3,2.5))
-extent, aspect = make_extent(v0_range,np.log10(beta_range))
-vmin,vmax = np.nanmin(tot_t1_mean),np.nanpercentile(tot_t1_mean,60)
+extent, aspect = make_extent(tau_range,np.log10(beta_max_range))
+vmin,vmax = np.nanmin(tot_t1_mean),np.nanpercentile(tot_t1_mean,65)
 ax.imshow(flipim(tot_t1_mean),extent=extent,aspect=aspect,cmap=plt.cm.coolwarm,vmin=vmin,vmax=vmax)
 sm = plt.cm.ScalarMappable(cmap=plt.cm.coolwarm, norm=plt.Normalize(vmax=vmax, vmin=vmin))
 sm._A = []
@@ -98,34 +62,32 @@ cl.set_label("Number of Type IV T1s")
 ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
 fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
 fig.show()
-fig.savefig("paper_plots/Fig1/t1_het_phase_diag.pdf",dpi=300)
-
-
 
 def get_t1s(X):
     Id, Rep = X
     i, run = (Rep%6), int(Rep/6)
     try:
-        FILE = np.load("from_unsorted/jamming_analysis/%d_%d_%s.npz" % (Id,i,run))
+        FILE = np.load("from_unsorted_control/jamming_analysis/%d_%d_%s.npz" % (Id,i,run))
         return FILE["t1_swap_freq"],FILE["changed_t"]
         # return FILE["av_rate"]
 
     except FileNotFoundError:
         return np.nan
 
-inputs2 = np.array([ID_mat[np.where(VV == v0_range[7])],RR[np.where(VV == v0_range[7])]]).T
+mask = TT == tau_range[0]
+inputs2 = np.array([ID_mat[np.where(mask)],RR[np.where(mask)]]).T
 
 num_cores = multiprocessing.cpu_count()
 t1s = Parallel(n_jobs=num_cores)(delayed(get_t1s)(inputt) for inputt in inputs2)
 t_span = np.arange(0,500,0.025)
 fig, ax = plt.subplots(1,6,figsize=(10,2.2),sharey=True)
 ax = ax.ravel()
-cols = plt.cm.plasma(np.linspace(0,1,12))
+cols = plt.cm.plasma((np.linspace(-2.5,-1,12) + 3)/2)
 swap_freq_fin = np.zeros((12,6))
 for i in range(12):
     t1_beta = t1s[12*i:12*(i+1)]
     swap_freq = np.zeros((20000,12,6))
-    for j in range(12):
+    for j in range(6):
         # if type(t1_beta) is not float:
         t1_swap_freq,changed_t = t1_beta[j]
         swap_freq[changed_t,j]=t1_swap_freq
@@ -134,18 +96,19 @@ for i in range(12):
         ax[j].plot(t_span,np.cumsum(swap_freq[:,j]),color=cols[i])
     ax[3].plot(t_span,np.cumsum(swap_freq[:, 3])+np.cumsum(swap_freq[:, 5]), color=cols[i])
     ax[4].plot(t_span,np.cumsum(swap_freq[:, 4]), color=cols[i])
-    # ax[5].plot(np.cumsum(swap_freq.sum(axis=1)), color=cols[i])
+    ax[5].plot(np.cumsum(swap_freq.sum(axis=1)), color=cols[i])
     swap_freq_fin[i] = swap_freq.sum(axis=0)
-sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(vmax=np.log10(beta_range.max()), vmin=np.log10(beta_range.min())))
+
+sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(vmax=-1, vmin=-3))
 sm._A = []
 cl = plt.colorbar(sm, ax=ax[5], pad=0.05, fraction=0.175, aspect=10, orientation="vertical")
-cl.set_label(r"$log_{10} \ \beta$")
+cl.set_label(r"$log_{10} \ \beta_{max}$")
 ax[0].set(ylabel="Cumulative \n number of T1s")
 for axx in ax:
     axx.set(xlabel="t")
 fig.subplots_adjust(top=0.8, bottom=0.3, left=0.25, right=0.8,wspace=0.25)
 fig.show()
-fig.savefig("paper_plots/Fig1/cumulativeT1_v07.pdf",dpi=300)
+fig.savefig("paper_plots/Fig5/cumulativeT1_tau500.pdf",dpi=300)
 
 
 

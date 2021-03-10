@@ -471,6 +471,7 @@ class Tissue:
                         a, b = TRI[j], TRI[np.mod(j + 1, 3)]
                         if (a >= 0) and (b >= 0):
                             X = np.stack((x[a], x[b])).T
+                            X[:,1] = X[:,0] + np.mod(X[:,1] - X[:,0] + self.L/2,self.L)-self.L/2
                             ax.plot(X[0], X[1], color="black")
 
 
