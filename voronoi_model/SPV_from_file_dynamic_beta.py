@@ -32,22 +32,33 @@ vor.k = 0
 
 vor.set_interaction(W = np.array([[0, 1], [1, 0]]),c_types=c_types,pE=0.5)
 
-vor.tau = 150
+vor.tau = 459
 vor.beta_min = 10**-2.5
-vor.beta_max = 10**-1.25
+vor.beta_max = 10**-1.68
+
 # beta_mean = (vor.beta_max+vor.beta_min)/2
 # vor.beta_max,vor.beta_min = beta_mean,beta_mean
 
 
-vor.set_t_span(0.025,150)
+vor.set_t_span(0.025,500)
 
-# beta_t = np.array([vor.beta_t(t) for t in vor.t_span])
-# plt.plot(beta_t)
-# plt.show()
+fig, ax = plt.subplots()
+for i, tau in enumerate(tau_range):
+    beta_t = np.array([_beta_t(10**-1.68, 10**-2.5, tau, t) for t in vor.t_span])
+    ax.plot(beta_t,color=plt.cm.plasma(i/12))
+fig.show()
 
 print(vor.t_span.size)
 
 vor.simulate_dynamic_beta(equiangulate=False)
+plt.plot(vor.get_num_islands(100))
+vor.tau = 459
+vor.beta_min = 10**-1.68
+vor.beta_max = 10**-1.68
+vor.simulate_dynamic_beta(equiangulate=False)
+plt.plot(np.array(vor.get_num_islands(100)).sum(axis=0))
+plt.show()
+
 vor.plot_scatter = False
 
 

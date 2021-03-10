@@ -12,4 +12,5 @@
 source activate apical_domain
 
 #python voronoi_model/SPV_from_file_cluster.py "$1" "$2" "$3" "$4"
-python voronoi_model/SPV_from_file_cluster_dynamic_beta.py "$1" "$2" "$3" "$4"
+#python voronoi_model/SPV_from_file_cluster_dynamic_beta.py "$1" "$2" "$3" "$4"
+python voronoi_model/SPV_from_file_cluster_dynamic_beta_control.py "$1" "$2" "$3" "$4"
