@@ -26,7 +26,7 @@ def run_simulation(X):
 
 
     r = 10
-    vor.v0 = v0
+    vor.v0 = 0.075
     vor.Dr = 1e-1
     # beta = beta
 
