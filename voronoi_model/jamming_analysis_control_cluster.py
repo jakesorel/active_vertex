@@ -173,7 +173,7 @@ def check_not_neighbours(quartets_t,tris):
     a,b = quartets_t[:,0],quartets_t[:,-1]
     not_neighbours_mask = np.zeros(a.size,dtype=np.bool_)
     for i, (ai,bi) in enumerate(zip(a,b)):
-        not_neighbours_mask[i] = np.sum(any_axis_1(tris == ai)* any_axis_1(tris ==bi)*1.0)>1
+        not_neighbours_mask[i] = np.sum(any_axis_1(tris == ai)* any_axis_1(tris ==bi)*1.0)==0
     return quartets_t[not_neighbours_mask]
 
 @jit(nopython=True)
@@ -217,8 +217,24 @@ def get_T1_swap_frequencies(tri_save, x_save,c_types,L,cache_T = 20):
         quartets_tp1 = pair_t1s(tri_tp1)
         quartets_t = filter_pairs(quartets_t, quartets_tp1)
         if quartets_t.shape[0]!=0:
-            # quartets_t = filter_true_interface(quartets_t,x_save[t],L)
+            # print("yes",ti,t)
+        #     # quartets_t = filter_true_interface(quartets_t,x_save[t],L)
             quartets_t = check_not_neighbours(quartets_t,tri_save[t])
+        # if quartets_t.shape[0]!=0:
+        #     print("yes")
+        #
+        # fig, ax = plt.subplots()
+        # vor.plot_vor(vor.x_save[t],ax,tri=tri_save[t])
+        # for TRI in vor.tri_save[t+1]:
+        #     for j in range(3):
+        #         a, b = TRI[j], TRI[np.mod(j + 1, 3)]
+        #         if (a >= 0) and (b >= 0):
+        #             X = np.stack((vor.x_save[t+1,a], vor.x_save[t+1,b])).T
+        #             X[:, 1] = X[:, 0] + np.mod(X[:, 1] - X[:, 0] + vor.L / 2, vor.L) - vor.L / 2
+        #             ax.plot(X[0], X[1], color="green")
+        # for i in range(vor.n_c):
+        #     ax.text(vor.x_save[t,i,0],vor.x_save[t,i,1],i)
+        # fig.show()
 
         if quartets_t.shape[0] != 0:
             quar = check_cache(cache,cache_T,changed_t,t,ti,quartets_t)
@@ -226,8 +242,6 @@ def get_T1_swap_frequencies(tri_save, x_save,c_types,L,cache_T = 20):
             quartets_t = quar
             if quartets_t.size != 0:
                 conf_type = c_types[quartets_t.ravel()].reshape(-1, 4)
-                if (conf_type == np.array((1,0,0,1))).all():
-                    print(ti,t,quartets_t)
                 for conf_t in conf_type:
                     mask = all_axis_1_4(conf_t == types) + all_axis_1_4(conf_t == inv_types) + all_axis_1_4(
                         conf_t == recip_types) + all_axis_1_4(conf_t == recip_inv_types)
