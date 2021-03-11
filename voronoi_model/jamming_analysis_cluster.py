@@ -49,7 +49,6 @@ def initialize_vor(Id, i, run):
     return vor
 
 
-
 def get_x2(T,L,x_save):
     x_s = x_save[T:]
     disp = np.mod(x_s - x_s[0] + L/2,L)-L/2
@@ -93,13 +92,14 @@ def pair_t1s(tri_t):
     for i, tri in enumerate(tri_t):
         if (i==pairs).sum() == 0:
             for j in range(3):
-                a,b,c = np.roll(tri,j)
-                mask = any_axis_1(tri_t == a)*any_axis_1(tri_t == b)*(~any_axis_1(tri_t == c))
+                tri_roll = np.roll(tri,j)
+                a,b,c = tri_roll
+                mask = (~any_axis_1(tri_t == a))*any_axis_1(tri_t == b)*any_axis_1(tri_t == c)
                 if mask.sum()==1:
                     pairs[i] = int(np.dot(mask*1.0,arange))
                     tri_pair = tri_t[mask][0]
-                    other_cell = tri_pair[(tri_pair!=a)*(tri_pair!=b)][0]
-                    quartet = np.append(tri,other_cell)
+                    other_cell = tri_pair[(tri_pair!=c)*(tri_pair!=b)][0]
+                    quartet = np.append(tri_roll,other_cell)
                     quartets[i] = quartet
     return quartets[any_axis_1_4(quartets != -1)]
 
@@ -107,7 +107,7 @@ def pair_t1s(tri_t):
 def filter_pairs(quartets_t,quartets_tp1):
     mask = np.zeros(quartets_t.shape[0],dtype=np.bool_)
     for i, quartet in enumerate(quartets_t):
-        predicted_quartet = np.array((quartet[0],quartet[3],quartet[2],quartet[1]))
+        predicted_quartet = np.array((quartet[1],quartet[3],quartet[0],quartet[2]))
         mask[i] = all_axis_1_4(predicted_quartet == quartets_tp1).any() + all_axis_1_4(np.flip(predicted_quartet) == quartets_tp1).any()
     return quartets_t[mask]
 
@@ -130,8 +130,53 @@ def check_cache(cache,cache_T,changed_t,t,ti,quartets_t):
     quartets_t = quartets_t[any_axis_1_4(quartets_t!=-1)]
     return quartets_t
 
+@jit(nopython=True,cache=True)
+def triangle_area(a,b,c):
+    s1,s2 = a-b,b-c
+    return 1/2*np.abs(s1[:,0]*s2[:,1]-s1[:,1]*s2[:,0])
+
+@jit(nopython=True,cache=True)
+def check_true_interface(quartet,x,L,res=1e-3):
+    """
+    Determines if vertex lies within triangle. I.e. rejects obtuse cases
+
+    :param quartet:
+    :param x:
+    :param L:
+    :param res:
+    :return:
+    """
+    x_reg = x[quartet]
+    # tri_reg = np.array(((0,1,2),(3,2,1)))
+    tri_reg = np.array((0, 1, 2, 3, 2, 1))
+    Cents = x_reg.ravel()[tri_reg].reshape(-1,3,2)
+    vs = circumcenter_periodic(Cents,L)
+
+    As = np.zeros(vs.shape[0])
+    for i in range(3):
+        a,b = Cents[:,i],Cents[:,np.mod(i+1,3)]
+        As += triangle_area(a,b,vs)
+    true_A = triangle_area(Cents[:,0],Cents[:,1],Cents[:,2])
+    return np.max(As-true_A)<res
+
 @jit(nopython=True)
-def get_T1_swap_frequencies(tri_save, c_types,cache_T = 20):
+def filter_true_interface(quartets_t,x,L):
+    true_interface_mask = np.zeros(quartets_t.shape[0], dtype=np.bool_)
+    for i, quartet in enumerate(quartets_t):
+        true_interface_mask[i] = check_true_interface(quartet, x, L)
+    quartets_t = quartets_t[true_interface_mask]
+    return quartets_t
+
+@jit(nopython=True)
+def check_not_neighbours(quartets_t,tris):
+    a,b = quartets_t[:,0],quartets_t[:,-1]
+    not_neighbours_mask = np.zeros(a.size,dtype=np.bool_)
+    for i, (ai,bi) in enumerate(zip(a,b)):
+        not_neighbours_mask[i] = np.sum(any_axis_1(tris == ai)* any_axis_1(tris ==bi)*1.0)==0
+    return quartets_t[not_neighbours_mask]
+
+@jit(nopython=True)
+def get_T1_swap_frequencies(tri_save,c_types,cache_T = 20):
     """
     caches quartets for cache_T to prevent counting of flipping
 
@@ -145,7 +190,9 @@ def get_T1_swap_frequencies(tri_save, c_types,cache_T = 20):
     unchanged = np.zeros(tri_save.shape[0]-1,dtype=np.bool_)
     for i, (tri_tp1, tri_t) in enumerate(zip(tri_save[1:], tri_save[:-1])):
         unchanged[i] = (tri_tp1 ==tri_t).all()
+
     changed_t = np.nonzero(~unchanged)[0]
+
 
     types = np.array(((0, 0, 0, 0),
                       (0, 0, 0, 1),
@@ -168,7 +215,25 @@ def get_T1_swap_frequencies(tri_save, c_types,cache_T = 20):
         quartets_t = pair_t1s(tri_t)
         quartets_tp1 = pair_t1s(tri_tp1)
         quartets_t = filter_pairs(quartets_t, quartets_tp1)
-
+        if quartets_t.shape[0]!=0:
+            # print("yes",ti,t)
+            # quartets_t = filter_true_interface(quartets_t,x_save[t],L)
+            quartets_t = check_not_neighbours(quartets_t,tri_save[t])
+        # if quartets_t.shape[0]!=0:
+        #     print("yes")
+        #
+        # fig, ax = plt.subplots()
+        # vor.plot_vor(vor.x_save[t],ax,tri=tri_save[t])
+        # for TRI in vor.tri_save[t+1]:
+        #     for j in range(3):
+        #         a, b = TRI[j], TRI[np.mod(j + 1, 3)]
+        #         if (a >= 0) and (b >= 0):
+        #             X = np.stack((vor.x_save[t+1,a], vor.x_save[t+1,b])).T
+        #             X[:, 1] = X[:, 0] + np.mod(X[:, 1] - X[:, 0] + vor.L / 2, vor.L) - vor.L / 2
+        #             ax.plot(X[0], X[1], color="green")
+        # for i in range(vor.n_c):
+        #     ax.text(vor.x_save[t,i,0],vor.x_save[t,i,1],i)
+        # fig.show()
 
         if quartets_t.shape[0] != 0:
             quar = check_cache(cache,cache_T,changed_t,t,ti,quartets_t)

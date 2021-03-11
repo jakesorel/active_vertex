@@ -59,9 +59,9 @@ sm = plt.cm.ScalarMappable(cmap=plt.cm.coolwarm, norm=plt.Normalize(vmax=vmax, v
 sm._A = []
 cl = plt.colorbar(sm, ax=ax, pad=0.05, fraction=0.085, aspect=10, orientation="vertical")
 cl.set_label("Number of Type IV T1s")
-ax.set(xlabel=r"$v_0$",ylabel=r"$log_{10} \ \beta$")
+ax.set(xlabel=r"$\tau$",ylabel=r"$log_{10} \ \beta_{max}$")
 fig.subplots_adjust(top=0.8, bottom=0.2, left=0.25, right=0.8)
-fig.show()
+fig.savefig("paper_plots/Fig5/T1_IV_beta_tau.pdf",dpi=300)
 
 def get_t1s(X):
     Id, Rep = X
@@ -74,13 +74,13 @@ def get_t1s(X):
     except FileNotFoundError:
         return np.nan
 
-mask = TT == tau_range[0]
+mask = TT == tau_range[-1]
 inputs2 = np.array([ID_mat[np.where(mask)],RR[np.where(mask)]]).T
 
 num_cores = multiprocessing.cpu_count()
 t1s = Parallel(n_jobs=num_cores)(delayed(get_t1s)(inputt) for inputt in inputs2)
 t_span = np.arange(0,500,0.025)
-fig, ax = plt.subplots(1,6,figsize=(10,2.2),sharey=True)
+fig, ax = plt.subplots(1,6,figsize=(10,2.2))
 ax = ax.ravel()
 cols = plt.cm.plasma((np.linspace(-2.5,-1,12) + 3)/2)
 swap_freq_fin = np.zeros((12,6))

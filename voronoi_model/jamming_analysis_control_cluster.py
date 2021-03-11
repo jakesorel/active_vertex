@@ -218,7 +218,7 @@ def get_T1_swap_frequencies(tri_save, x_save,c_types,L,cache_T = 20):
         quartets_t = filter_pairs(quartets_t, quartets_tp1)
         if quartets_t.shape[0]!=0:
             # print("yes",ti,t)
-        #     # quartets_t = filter_true_interface(quartets_t,x_save[t],L)
+            # quartets_t = filter_true_interface(quartets_t,x_save[t],L)
             quartets_t = check_not_neighbours(quartets_t,tri_save[t])
         # if quartets_t.shape[0]!=0:
         #     print("yes")
